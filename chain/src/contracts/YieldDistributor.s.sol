@@ -15,25 +15,15 @@ import {IYieldDistributor} from 'interfaces/IYieldDistributor.sol';
 contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
   // --- Registry ---
 
-  /**
-   * @notice The address of the $BASE_TOKEN token contract
-   * @dev BASE_TOKEN is an implementation of BREAD
-   */
+  /// @inheritdoc IYieldDistributor
   Bread public BASE_TOKEN;
-  /// @notice The address of the $REWARD_TOKEN token contract
+  /// @inheritdoc IYieldDistributor
   ERC20Votes public REWARD_TOKEN;
-
-  // --- Params ---
-
-  /// @notice The parameters for the yield distributor
-  YieldDistributorParams internal _params;
 
   // --- Data ---
 
-  /// @inheritdoc IYieldDistributor
-  uint256 public currentVotes;
-  /// @inheritdoc IYieldDistributor
-  uint256 public prevCycleStartBlock;
+  /// @notice IYieldDistributor
+  YieldDistributorParams internal _params;
 
   /// @notice Array of projects eligible for yield distribution
   address[] public projects;
@@ -100,15 +90,15 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
 
   /// @inheritdoc IYieldDistributor
   function queueProjectAddition(address _project) external onlyOwner {
-    if (_findProject(_project)) revert AlreadyMemberProject();
-    if (_isQueued(_project, queuedProjectsForAddition)) revert ProjectAlreadyQueued();
+    if (_isListed(_project, projects)) revert AlreadyMemberProject();
+    if (_isListed(_project, queuedProjectsForAddition)) revert ProjectAlreadyQueued();
     queuedProjectsForAddition.push(_project);
   }
 
   /// @inheritdoc IYieldDistributor
   function queueProjectRemoval(address _project) external onlyOwner {
-    if (!_findProject(_project)) revert ProjectNotFound();
-    if (_isQueued(_project, queuedProjectsForRemoval)) revert ProjectAlreadyQueued();
+    if (!_isListed(_project, projects)) revert ProjectNotFound();
+    if (_isListed(_project, queuedProjectsForRemoval)) revert ProjectAlreadyQueued();
     queuedProjectsForRemoval.push(_project);
   }
 
@@ -135,29 +125,26 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
 
   /// @inheritdoc IYieldDistributor
   function getCurrentVotingPower(address _account) public view returns (uint256) {
-    return getVotingPowerForPeriod(address(BASE_TOKEN), prevCycleStartBlock, _params.lastClaimedBlockNumber, _account)
-      + _getVotingPowerForPeriod(REWARD_TOKEN, prevCycleStartBlock, _params.lastClaimedBlockNumber, _account);
+    return getVotingPowerForPeriod(address(BASE_TOKEN), _params.prevCycleStartBlock, _params.lastClaimedBlock, _account)
+      + _getVotingPowerForPeriod(REWARD_TOKEN, _params.prevCycleStartBlock, _params.lastClaimedBlock, _account);
   }
 
   /// @inheritdoc IYieldDistributor
   function getCurrentAccumulatedVotingPower(address _account) public view returns (uint256) {
-    return _getVotingPowerForPeriod(REWARD_TOKEN, _params.lastClaimedBlockNumber, block.number, _account)
-      + getVotingPowerForPeriod(address(BASE_TOKEN), _params.lastClaimedBlockNumber, block.number, _account);
+    return _getVotingPowerForPeriod(REWARD_TOKEN, _params.lastClaimedBlock, block.number, _account)
+      + getVotingPowerForPeriod(address(BASE_TOKEN), _params.lastClaimedBlock, block.number, _account);
   }
 
   /// @inheritdoc IYieldDistributor
-  function resolveYieldDistribution() public view returns (bool, bytes memory) {
-    uint256 _available_yield = BASE_TOKEN.balanceOf(address(this)) + BASE_TOKEN.yieldAccrued();
-    if (
-      /// No votes were cast
-      /// Already claimed this cycle
-      currentVotes == 0 || block.number < _params.lastClaimedBlockNumber + _params.cycleLength
-        || _available_yield / _params.yieldFixedSplitDivisor < projects.length
-    ) {
-      /// Yield is insufficient to distribute
-      return (false, new bytes(0));
-    } else {
-      return (true, abi.encodePacked(this.distributeYield.selector));
+  function resolveYieldDistribution() public view returns (bool _b, bytes memory _data) {
+    if (_params.currentVotes > 0 && block.number > _params.lastClaimedBlock + _params.cycleLength) {
+      uint256 _currentYield =
+        (BASE_TOKEN.balanceOf(address(this)) + BASE_TOKEN.yieldAccrued()) / _params.yieldFixedSplitDivisor;
+
+      if (_currentYield >= projects.length) {
+        _b = true;
+        _data = abi.encodePacked(IYieldDistributor.distributeYield.selector);
+      }
     }
   }
 
@@ -167,8 +154,8 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
     if (!_resolved) revert YieldNotResolved();
 
     BASE_TOKEN.claimYield(BASE_TOKEN.yieldAccrued(), address(this));
-    prevCycleStartBlock = _params.lastClaimedBlockNumber;
-    _params.lastClaimedBlockNumber = block.number;
+    _params.prevCycleStartBlock = _params.lastClaimedBlock;
+    _params.lastClaimedBlock = block.number;
     uint256 balance = BASE_TOKEN.balanceOf(address(this));
     uint256 _fixedYield = balance / _params.yieldFixedSplitDivisor;
     uint256 _baseSplit = _fixedYield / projects.length;
@@ -176,14 +163,14 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
 
     for (uint256 i; i < projects.length; ++i) {
       uint256 _votedSplit =
-        ((projectDistributions[i] * _votedYield * _params.precision) / currentVotes) / _params.precision;
+        ((projectDistributions[i] * _votedYield * _params.precision) / _params.currentVotes) / _params.precision;
       BASE_TOKEN.transfer(projects[i], _votedSplit + _baseSplit);
     }
 
     _updateBreadchainProjects();
-    emit YieldDistributed(balance, currentVotes, projectDistributions);
+    emit YieldDistributed(balance, _params.currentVotes, projectDistributions);
 
-    delete currentVotes;
+    delete _params.currentVotes;
     projectDistributions = new uint256[](projects.length);
   }
 
@@ -205,25 +192,25 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
     }
     if (_totalPoints == 0) revert ZeroVotePoints();
 
-    bool _hasVotedInCycle = accountLastVoted[_account] > _params.lastClaimedBlockNumber;
+    bool _hasVotedInCycle = accountLastVoted[_account] > _params.lastClaimedBlock;
     uint256[] storage __voterDistributions = _voterDistributions[_account];
     if (!_hasVotedInCycle) {
       delete _voterDistributions[_account];
-      currentVotes += _votingPower;
+      _params.currentVotes += _votingPower;
     }
 
-    for (uint256 i; i < _points.length; ++i) {
+    uint256 _l = _points.length;
+    for (uint256 i; i < _l; ++i) {
       if (!_hasVotedInCycle) __voterDistributions.push(0);
       else projectDistributions[i] -= __voterDistributions[i];
 
       uint256 _currentProjectDistribution =
         ((_points[i] * _votingPower * _params.precision) / _totalPoints) / _params.precision;
       projectDistributions[i] += _currentProjectDistribution;
-      __voterDistributions[i] = _currentProjectDistribution;
+      __voterDistributions[i] = _currentProjectDistribution; // TODO: what is this for?
     }
 
     accountLastVoted[_account] = block.number;
-
     emit BreadHolderVoted(_account, _points, projects);
   }
 
@@ -234,24 +221,14 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
       projects.push(_project);
       emit ProjectAdded(_project);
     }
-
-    address[] memory _oldProjects = projects;
+    address[] memory _prevProjects = projects;
     delete projects;
 
-    for (uint256 i; i < _oldProjects.length; ++i) {
-      address _project = _oldProjects[i];
-      bool _remove;
-
-      for (uint256 j; j < queuedProjectsForRemoval.length; ++j) {
-        if (_project == queuedProjectsForRemoval[j]) {
-          _remove = true;
-          emit ProjectRemoved(_project);
-          break;
-        }
-      }
-      if (!_remove) {
-        projects.push(_project);
-      }
+    uint256 _l = _prevProjects.length;
+    for (uint256 i; i < _l; ++i) {
+      address _project = _prevProjects[i];
+      if (_isListed(_project, queuedProjectsForRemoval)) emit ProjectRemoved(_project);
+      else projects.push(_project);
     }
     delete queuedProjectsForAddition;
     delete queuedProjectsForRemoval;
@@ -275,7 +252,6 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
     if (_currentCheckpoint._key > _end) return 0;
 
     uint256 _totalVotingPower;
-
     for (uint32 i = _numCheckpoints; i > 0;) {
       _currentCheckpoint = _sourceContract.checkpoints(_account, --i);
 
@@ -293,46 +269,26 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
   /// @notice see IYieldDistributor
   function _modifyParam(bytes32 _param, uint256 _value) internal {
     if (_value == 0) revert ZeroValue();
-
-    if (_param == 'params.minRequiredVotingPower') {
-      _params.minRequiredVotingPower = _value;
-    } else if (_param == 'params.maxPoints') {
-      _params.maxPoints = _value;
-    } else if (_param == 'params.cycleLength') {
-      _params.cycleLength = _value;
-    } else if (_param == 'params.yieldFixedSplitDivisor') {
-      _params.yieldFixedSplitDivisor = _value;
-    } else {
-      revert InvalidParam();
-    }
+    if (_param == 'params.minRequiredVotingPower') _params.minRequiredVotingPower = _value;
+    else if (_param == 'params.maxPoints') _params.maxPoints = _value;
+    else if (_param == 'params.cycleLength') _params.cycleLength = _value;
+    else if (_param == 'params.yieldFixedSplitDivisor') _params.yieldFixedSplitDivisor = _value;
+    else revert InvalidParam();
   }
 
   /// @notice see IYieldDistributor
   function _modifyAddress(bytes32 _param, address _contract) internal {
     if (_contract == address(0)) revert ZeroValue();
-
-    if (_param == 'baseToken') {
-      BASE_TOKEN = Bread(_contract);
-    } else if (_param == 'rewardToken') {
-      REWARD_TOKEN = ERC20Votes(_contract);
-    } else {
-      revert InvalidParam();
-    }
+    if (_param == 'baseToken') BASE_TOKEN = Bread(_contract);
+    else if (_param == 'rewardToken') REWARD_TOKEN = ERC20Votes(_contract);
+    else revert InvalidParam();
   }
 
-  /// @notice Internal function for finding a project in the project list
-  function _findProject(address _project) internal view returns (bool _b) {
-    for (uint256 i; i < projects.length; ++i) {
-      if (projects[i] == _project) {
-        _b = true;
-      }
-    }
-  }
-
-  /// @notice Internal function for checking if a project is queued
-  function _isQueued(address _project, address[] memory _queuedProjects) internal pure returns (bool _b) {
-    for (uint256 i; i < _queuedProjects.length; ++i) {
-      if (_queuedProjects[i] == _project) {
+  /// @notice Internal function for checking if a project is in an array
+  function _isListed(address _project, address[] memory _projects) internal pure returns (bool _b) {
+    uint256 _l = _projects.length;
+    for (uint256 i; i < _l; ++i) {
+      if (_projects[i] == _project) {
         _b = true;
       }
     }
@@ -344,8 +300,9 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
   modifier enforceParams(YieldDistributorParams memory _ydp) {
     if (
       _ydp.precision == 0 || _ydp.minRequiredVotingPower == 0 || _ydp.maxPoints == 0 || _ydp.cycleLength == 0
-        || _ydp.yieldFixedSplitDivisor == 0 || _ydp.lastClaimedBlockNumber == 0
+        || _ydp.yieldFixedSplitDivisor == 0 || _ydp.lastClaimedBlock == 0
     ) revert ZeroValue();
+    if (_ydp.currentVotes != 0 || _ydp.prevCycleStartBlock != 0) revert InvalidParam();
     _;
   }
 }
