@@ -1,39 +1,52 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "interfaces/IEAS.sol";
+import "../interfaces/IEAS.sol";
 
 contract ProjectValidator {
     IEAS public eas;
-    address public optimismFoundation;
+    address[] public optimismFoundationAttestors;
     uint256 public roundStartTime;
     uint256 public roundEndTime;
     mapping(bytes32 => bool) public eligibleProjects;
+
+    // Constants for hashed values
+    bytes32 private constant GRANTEE_HASH = keccak256(bytes("Grantee"));
+    bytes32 private constant APPLICATION_APPROVED_HASH = keccak256(bytes("Application Approved"));
 
     event ProjectValidated(bytes32 indexed approvalAttestation, address indexed recipient);
 
     constructor(
         address _easAddress,
-        address _optimismFoundation,
+        address[] memory _optimismFoundationAttestors,
         uint256 _roundStartTime,
         uint256 _roundEndTime
     ) {
         eas = IEAS(_easAddress);
-        optimismFoundation = _optimismFoundation;
+        optimismFoundationAttestors = _optimismFoundationAttestors;
         roundStartTime = _roundStartTime;
         roundEndTime = _roundEndTime;
     }
 
-    function validateProject(bytes32 approvalAttestation) external {
-        // Check that it hasn't already been included in the eligible projects
-        require(!eligibleProjects[approvalAttestation], "Project already included");
+    function validateProject(bytes32 approvalAttestation) external returns (bool) {
+        // If the project is already included, return true
+        if (eligibleProjects[approvalAttestation]) {
+            return true;
+        }
 
         // Get the attestation from the EAS contract
         IEAS.Attestation memory attestation = eas.getAttestation(approvalAttestation);
         require(attestation.uid != bytes32(0), "Attestation not found");
 
-        // Check that the attester is the Optimism Foundation
-        require(attestation.attester == optimismFoundation, "Invalid attester");
+        // Check that the attester is one of the Optimism Foundation attestors
+        bool isValidAttester = false;
+        for (uint256 i = 0; i < optimismFoundationAttestors.length; i++) {
+            if (attestation.attester == optimismFoundationAttestors[i]) {
+                isValidAttester = true;
+                break;
+            }
+        }
+        require(isValidAttester, "Invalid attester");
 
         // Check that the attestation time is within the current round
         require(
@@ -49,14 +62,13 @@ contract ProjectValidator {
 
         // Check that param1 == "Grantee"
         require(
-            keccak256(abi.encodePacked(param1)) == keccak256(abi.encodePacked("Grantee")),
+            keccak256(bytes(param1)) == GRANTEE_HASH,
             "Invalid param1"
         );
 
         // Check that param5 == "Application Approved"
         require(
-            keccak256(abi.encodePacked(param5)) ==
-                keccak256(abi.encodePacked("Application Approved")),
+            keccak256(bytes(param5)) == APPLICATION_APPROVED_HASH,
             "Invalid param5"
         );
 
@@ -65,5 +77,7 @@ contract ProjectValidator {
 
         // Emit event
         emit ProjectValidated(approvalAttestation, attestation.recipient);
+
+        return true;
     }
 }
