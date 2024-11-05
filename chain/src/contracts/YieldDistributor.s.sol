@@ -2,8 +2,8 @@
 pragma solidity ^0.8.22;
 
 import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
-import {ERC20VotesUpgradeable} from '@openzeppelin-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol';
 import {Checkpoints} from '@openzeppelin/utils/structs/Checkpoints.sol';
+import {ERC20Votes} from '@openzeppelin/token/ERC20/extensions/ERC20Votes.sol';
 import {Bread} from '@bread-token/src/Bread.sol';
 import {IYieldDistributor} from 'interfaces/IYieldDistributor.sol';
 
@@ -12,13 +12,16 @@ import {IYieldDistributor} from 'interfaces/IYieldDistributor.sol';
  * @notice Distribute $OBD yield to eligible member projects based on a voted distribution
  * @author Breadchain Collective
  */
-contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
+contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
   // --- Registry ---
 
-  /// @notice The address of the $BREAD token contract
-  Bread public BREAD;
-  /// @notice The address of the `ButteredBread` token contract
-  ERC20VotesUpgradeable public BUTTERED_BREAD;
+  /**
+   * @notice The address of the $BASE_TOKEN token contract
+   * @dev BASE_TOKEN is an implementation of BREAD
+   */
+  Bread public BASE_TOKEN;
+  /// @notice The address of the $REWARD_TOKEN token contract
+  ERC20Votes public REWARD_TOKEN;
 
   // --- Params ---
 
@@ -46,22 +49,24 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
   /// @notice The voting power allocated to projects by voters in the current cycle
   mapping(address => uint256[]) internal _voterDistributions;
 
+  // --- Initializer ---
+
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
   }
 
   function initialize(
-    address _bread,
-    address _butteredBread,
+    address _baseToken,
+    address _rewardToken,
     YieldDistributorParams memory __params,
     address[] memory _projects
   ) public initializer enforceParams(__params) {
-    if (_bread == address(0) || _butteredBread == address(0)) revert ZeroValue();
+    if (_baseToken == address(0) || _rewardToken == address(0)) revert ZeroValue();
     __Ownable_init(msg.sender);
 
-    BREAD = Bread(_bread);
-    BUTTERED_BREAD = ERC20VotesUpgradeable(_butteredBread);
+    BASE_TOKEN = Bread(_baseToken);
+    REWARD_TOKEN = ERC20Votes(_rewardToken);
     _params = __params;
 
     uint256 _l = _projects.length;
@@ -71,6 +76,8 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
       projects[i] = _projects[i];
     }
   }
+
+  // --- View Methods ---
 
   /// @inheritdoc IYieldDistributor
   function getParams() external view returns (YieldDistributorParams memory) {
@@ -82,6 +89,8 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
     return (projects, projectDistributions);
   }
 
+  // --- External Methods ---
+
   /// @inheritdoc IYieldDistributor
   function castVote(uint256[] calldata _points) external {
     uint256 _currentVotingPower = getCurrentVotingPower(msg.sender);
@@ -92,24 +101,14 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
   /// @inheritdoc IYieldDistributor
   function queueProjectAddition(address _project) external onlyOwner {
     if (_findProject(_project)) revert AlreadyMemberProject();
-
-    for (uint256 i; i < queuedProjectsForAddition.length; ++i) {
-      if (queuedProjectsForAddition[i] == _project) {
-        revert ProjectAlreadyQueued();
-      }
-    }
+    if (_isQueued(_project, queuedProjectsForAddition)) revert ProjectAlreadyQueued();
     queuedProjectsForAddition.push(_project);
   }
 
   /// @inheritdoc IYieldDistributor
   function queueProjectRemoval(address _project) external onlyOwner {
     if (!_findProject(_project)) revert ProjectNotFound();
-
-    for (uint256 i; i < queuedProjectsForRemoval.length; ++i) {
-      if (queuedProjectsForRemoval[i] == _project) {
-        revert ProjectAlreadyQueued();
-      }
-    }
+    if (_isQueued(_project, queuedProjectsForRemoval)) revert ProjectAlreadyQueued();
     queuedProjectsForRemoval.push(_project);
   }
 
@@ -123,55 +122,32 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
     _modifyAddress(_param, _address);
   }
 
+  // --- Public Methods ---
+
+  /// @inheritdoc IYieldDistributor
+  function getVotingPowerForPeriod(address _sourceContract, uint256 _start, uint256 _end, address _account)
+    public
+    view
+    returns (uint256)
+  {
+    return _getVotingPowerForPeriod(ERC20Votes(_sourceContract), _start, _end, _account);
+  }
+
   /// @inheritdoc IYieldDistributor
   function getCurrentVotingPower(address _account) public view returns (uint256) {
-    return this.getVotingPowerForPeriod(BREAD, prevCycleStartBlock, _params.lastClaimedBlockNumber, _account)
-      + this.getVotingPowerForPeriod(BUTTERED_BREAD, prevCycleStartBlock, _params.lastClaimedBlockNumber, _account);
+    return getVotingPowerForPeriod(address(BASE_TOKEN), prevCycleStartBlock, _params.lastClaimedBlockNumber, _account)
+      + _getVotingPowerForPeriod(REWARD_TOKEN, prevCycleStartBlock, _params.lastClaimedBlockNumber, _account);
   }
 
   /// @inheritdoc IYieldDistributor
   function getCurrentAccumulatedVotingPower(address _account) public view returns (uint256) {
-    return this.getVotingPowerForPeriod(BUTTERED_BREAD, _params.lastClaimedBlockNumber, block.number, _account)
-      + this.getVotingPowerForPeriod(BREAD, _params.lastClaimedBlockNumber, block.number, _account);
-  }
-
-  /// @inheritdoc IYieldDistributor
-  function getVotingPowerForPeriod(
-    ERC20VotesUpgradeable _sourceContract,
-    uint256 _start,
-    uint256 _end,
-    address _account
-  ) external view returns (uint256) {
-    if (_start >= _end) revert StartMustBeBeforeEnd();
-    if (_end > block.number) revert EndAfterCurrentBlock();
-
-    /// Initialized as the checkpoint count, but later used to track checkpoint index
-    uint32 _numCheckpoints = _sourceContract.numCheckpoints(_account);
-    if (_numCheckpoints == 0) return 0;
-
-    /// No voting power if the first checkpoint is after the end of the interval
-    Checkpoints.Checkpoint208 memory _currentCheckpoint = _sourceContract.checkpoints(_account, 0);
-    if (_currentCheckpoint._key > _end) return 0;
-
-    uint256 _totalVotingPower;
-
-    for (uint32 i = _numCheckpoints; i > 0;) {
-      _currentCheckpoint = _sourceContract.checkpoints(_account, --i);
-
-      if (_currentCheckpoint._key <= _end) {
-        uint48 _effectiveStart = _currentCheckpoint._key < _start ? uint48(_start) : _currentCheckpoint._key;
-        _totalVotingPower += _currentCheckpoint._value * (_end - _effectiveStart);
-
-        if (_effectiveStart == _start) break;
-        _end = _currentCheckpoint._key;
-      }
-    }
-    return _totalVotingPower;
+    return _getVotingPowerForPeriod(REWARD_TOKEN, _params.lastClaimedBlockNumber, block.number, _account)
+      + getVotingPowerForPeriod(address(BASE_TOKEN), _params.lastClaimedBlockNumber, block.number, _account);
   }
 
   /// @inheritdoc IYieldDistributor
   function resolveYieldDistribution() public view returns (bool, bytes memory) {
-    uint256 _available_yield = BREAD.balanceOf(address(this)) + BREAD.yieldAccrued();
+    uint256 _available_yield = BASE_TOKEN.balanceOf(address(this)) + BASE_TOKEN.yieldAccrued();
     if (
       /// No votes were cast
       /// Already claimed this cycle
@@ -190,10 +166,10 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
     (bool _resolved,) = resolveYieldDistribution();
     if (!_resolved) revert YieldNotResolved();
 
-    BREAD.claimYield(BREAD.yieldAccrued(), address(this));
+    BASE_TOKEN.claimYield(BASE_TOKEN.yieldAccrued(), address(this));
     prevCycleStartBlock = _params.lastClaimedBlockNumber;
     _params.lastClaimedBlockNumber = block.number;
-    uint256 balance = BREAD.balanceOf(address(this));
+    uint256 balance = BASE_TOKEN.balanceOf(address(this));
     uint256 _fixedYield = balance / _params.yieldFixedSplitDivisor;
     uint256 _baseSplit = _fixedYield / projects.length;
     uint256 _votedYield = balance - _fixedYield;
@@ -201,7 +177,7 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
     for (uint256 i; i < projects.length; ++i) {
       uint256 _votedSplit =
         ((projectDistributions[i] * _votedYield * _params.precision) / currentVotes) / _params.precision;
-      BREAD.transfer(projects[i], _votedSplit + _baseSplit);
+      BASE_TOKEN.transfer(projects[i], _votedSplit + _baseSplit);
     }
 
     _updateBreadchainProjects();
@@ -255,9 +231,7 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
   function _updateBreadchainProjects() internal {
     for (uint256 i; i < queuedProjectsForAddition.length; ++i) {
       address _project = queuedProjectsForAddition[i];
-
       projects.push(_project);
-
       emit ProjectAdded(_project);
     }
 
@@ -275,14 +249,45 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
           break;
         }
       }
-
       if (!_remove) {
         projects.push(_project);
       }
     }
-
     delete queuedProjectsForAddition;
     delete queuedProjectsForRemoval;
+  }
+
+  /// @notice IYieldDistributor
+  function _getVotingPowerForPeriod(ERC20Votes _sourceContract, uint256 _start, uint256 _end, address _account)
+    internal
+    view
+    returns (uint256)
+  {
+    if (_start >= _end) revert StartMustBeBeforeEnd();
+    if (_end > block.number) revert EndAfterCurrentBlock();
+
+    /// Initialized as the checkpoint count, but later used to track checkpoint index
+    uint32 _numCheckpoints = _sourceContract.numCheckpoints(_account);
+    if (_numCheckpoints == 0) return 0;
+
+    /// No voting power if the first checkpoint is after the end of the interval
+    Checkpoints.Checkpoint208 memory _currentCheckpoint = _sourceContract.checkpoints(_account, 0);
+    if (_currentCheckpoint._key > _end) return 0;
+
+    uint256 _totalVotingPower;
+
+    for (uint32 i = _numCheckpoints; i > 0;) {
+      _currentCheckpoint = _sourceContract.checkpoints(_account, --i);
+
+      if (_currentCheckpoint._key <= _end) {
+        uint48 _effectiveStart = _currentCheckpoint._key < _start ? uint48(_start) : _currentCheckpoint._key;
+        _totalVotingPower += _currentCheckpoint._value * (_end - _effectiveStart);
+
+        if (_effectiveStart == _start) break;
+        _end = _currentCheckpoint._key;
+      }
+    }
+    return _totalVotingPower;
   }
 
   /// @notice see IYieldDistributor
@@ -303,13 +308,13 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
   }
 
   /// @notice see IYieldDistributor
-  function _modifyAddress(bytes32 _param, address _address) internal {
-    if (_address == address(0)) revert ZeroValue();
+  function _modifyAddress(bytes32 _param, address _contract) internal {
+    if (_contract == address(0)) revert ZeroValue();
 
-    if (_param == 'bread') {
-      BREAD = Bread(_address);
-    } else if (_param == 'butteredBread') {
-      BUTTERED_BREAD = ERC20VotesUpgradeable(_address);
+    if (_param == 'baseToken') {
+      BASE_TOKEN = Bread(_contract);
+    } else if (_param == 'rewardToken') {
+      REWARD_TOKEN = ERC20Votes(_contract);
     } else {
       revert InvalidParam();
     }
@@ -324,8 +329,18 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
     }
   }
 
+  /// @notice Internal function for checking if a project is queued
+  function _isQueued(address _project, address[] memory _queuedProjects) internal pure returns (bool _b) {
+    for (uint256 i; i < _queuedProjects.length; ++i) {
+      if (_queuedProjects[i] == _project) {
+        _b = true;
+      }
+    }
+  }
+
   // --- Modifiers ---
 
+  /// @notice Modifier to enforce the parameters for the yield distributor
   modifier enforceParams(YieldDistributorParams memory _ydp) {
     if (
       _ydp.precision == 0 || _ydp.minRequiredVotingPower == 0 || _ydp.maxPoints == 0 || _ydp.cycleLength == 0

@@ -104,9 +104,22 @@ interface IYieldDistributor {
   /**
    * @notice Set param to updated value
    * @param _param name of param to update
-   * @param _address new address for param
+   * @param _contract new address for param
    */
-  function modifyAddress(bytes32 _param, address _address) external;
+  function modifyAddress(bytes32 _param, address _contract) external;
+
+  /**
+   * @notice Return the voting power for a specified user during a specified period of time
+   * @param _sourceContract Address of the source contract to get the voting power for
+   * @param _start Start time of the period to return the voting power for
+   * @param _end End time of the period to return the voting power for
+   * @param _account Address of user to return the voting power for
+   * @return uint256 Voting power of the specified user at the specified period of time
+   */
+  function getVotingPowerForPeriod(address _sourceContract, uint256 _start, uint256 _end, address _account)
+    external
+    view
+    returns (uint256);
 
   /**
    * @notice Return the current voting power of a user
@@ -122,20 +135,6 @@ interface IYieldDistributor {
    * @return uint256 The current accumulated voting power for the user
    */
   function getCurrentAccumulatedVotingPower(address _account) external view returns (uint256);
-
-  /**
-   * @notice Return the voting power for a specified user during a specified period of time
-   * @param _start Start time of the period to return the voting power for
-   * @param _end End time of the period to return the voting power for
-   * @param _account Address of user to return the voting power for
-   * @return uint256 Voting power of the specified user at the specified period of time
-   */
-  function getVotingPowerForPeriod(
-    ERC20VotesUpgradeable _sourceContract,
-    uint256 _start,
-    uint256 _end,
-    address _account
-  ) external view returns (uint256);
 
   /**
    * @notice Determine if the yield distribution is available
