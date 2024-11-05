@@ -99,59 +99,47 @@ contract ProjectValidatorTest is Test {
     validator.validateProject(uid);
   }
 
-    function testValidateProjectNotInCurrentSeason() public {
-        uint256 seasonStartTime = currentSeasonExpiry - SEASON_DURATION;
+  function testValidateProjectNotInCurrentSeason() public {
+    uint256 seasonStartTime = currentSeasonExpiry - SEASON_DURATION;
 
-        // Attestation before the season start
-        bytes32 uidEarly = keccak256(abi.encodePacked("test-attestation-early"));
-        IEAS.Attestation memory attestationEarly = IEAS.Attestation({
-            uid: uidEarly,
-            schema: bytes32(0),
-            refUID: bytes32(0),
-            time: uint64(seasonStartTime - 1), 
-            expirationTime: 0,
-            revocationTime: 0,
-            recipient: address(0x789),
-            attester: optimismFoundation1,
-            revocable: true,
-            data: abi.encode(
-                "Grantee",
-                "param2",
-                "param3",
-                "param4",
-                "Application Approved"
-            )
-        });
-        mockEAS.setAttestation(uidEarly, attestationEarly);
+    // Attestation before the season start
+    bytes32 uidEarly = keccak256(abi.encodePacked('test-attestation-early'));
+    IEAS.Attestation memory attestationEarly = IEAS.Attestation({
+      uid: uidEarly,
+      schema: bytes32(0),
+      refUID: bytes32(0),
+      time: uint64(seasonStartTime - 1),
+      expirationTime: 0,
+      revocationTime: 0,
+      recipient: address(0x789),
+      attester: optimismFoundation1,
+      revocable: true,
+      data: abi.encode('Grantee', 'param2', 'param3', 'param4', 'Application Approved')
+    });
+    mockEAS.setAttestation(uidEarly, attestationEarly);
 
-        vm.expectRevert("Attestation not in current season");
-        validator.validateProject(uidEarly);
+    vm.expectRevert('Attestation not in current season');
+    validator.validateProject(uidEarly);
 
-        // Attestation after the season end
-        bytes32 uidLate = keccak256(abi.encodePacked("test-attestation-late"));
-        IEAS.Attestation memory attestationLate = IEAS.Attestation({
-            uid: uidLate,
-            schema: bytes32(0),
-            refUID: bytes32(0),
-            time: uint64(currentSeasonExpiry + 1), 
-            expirationTime: 0,
-            revocationTime: 0,
-            recipient: address(0x789),
-            attester: optimismFoundation1,
-            revocable: true,
-            data: abi.encode(
-                "Grantee",
-                "param2",
-                "param3",
-                "param4",
-                "Application Approved"
-            )
-        });
-        mockEAS.setAttestation(uidLate, attestationLate);
+    // Attestation after the season end
+    bytes32 uidLate = keccak256(abi.encodePacked('test-attestation-late'));
+    IEAS.Attestation memory attestationLate = IEAS.Attestation({
+      uid: uidLate,
+      schema: bytes32(0),
+      refUID: bytes32(0),
+      time: uint64(currentSeasonExpiry + 1),
+      expirationTime: 0,
+      revocationTime: 0,
+      recipient: address(0x789),
+      attester: optimismFoundation1,
+      revocable: true,
+      data: abi.encode('Grantee', 'param2', 'param3', 'param4', 'Application Approved')
+    });
+    mockEAS.setAttestation(uidLate, attestationLate);
 
-        vm.expectRevert("Attestation not in current season");
-        validator.validateProject(uidLate);
-    }
+    vm.expectRevert('Attestation not in current season');
+    validator.validateProject(uidLate);
+  }
 
   function testValidateProjectInvalidParam1() public {
     bytes32 uid = keccak256(abi.encodePacked('test-attestation'));
