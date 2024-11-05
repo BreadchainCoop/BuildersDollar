@@ -78,6 +78,18 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
   }
 
   /// @inheritdoc IYieldDistributor
+  function getCurrentVotingDistribution() external view returns (address[] memory, uint256[] memory) {
+    return (projects, projectDistributions);
+  }
+
+  /// @inheritdoc IYieldDistributor
+  function castVote(uint256[] calldata _points) external {
+    uint256 _currentVotingPower = getCurrentVotingPower(msg.sender);
+    if (_currentVotingPower < _params.minRequiredVotingPower) revert InsufficientVotingPower();
+    _castVote(msg.sender, _points, _currentVotingPower);
+  }
+
+  /// @inheritdoc IYieldDistributor
   function queueProjectAddition(address _project) external onlyOwner {
     if (_findProject(_project)) revert AlreadyMemberProject();
 
@@ -111,43 +123,19 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
     _modifyAddress(_param, _address);
   }
 
-  /**
-   * @notice Returns the current distribution of voting power for projects
-   * @return address[] The current eligible member projects
-   * @return uint256[] The current distribution of voting power for projects
-   */
-  function getCurrentVotingDistribution() public view returns (address[] memory, uint256[] memory) {
-    return (projects, projectDistributions);
-  }
-
-  /**
-   * @notice Return the current voting power of a user
-   * @param _account Address of the user to return the voting power for
-   * @return uint256 The voting power of the user
-   */
+  /// @inheritdoc IYieldDistributor
   function getCurrentVotingPower(address _account) public view returns (uint256) {
     return this.getVotingPowerForPeriod(BREAD, prevCycleStartBlock, _params.lastClaimedBlockNumber, _account)
       + this.getVotingPowerForPeriod(BUTTERED_BREAD, prevCycleStartBlock, _params.lastClaimedBlockNumber, _account);
   }
 
-  /**
-   * @notice Get the current accumulated voting power for a user
-   * @dev This is the voting power that has been accumulated since the last yield distribution
-   * @param _account Address of the user to get the current accumulated voting power for
-   * @return uint256 The current accumulated voting power for the user
-   */
+  /// @inheritdoc IYieldDistributor
   function getCurrentAccumulatedVotingPower(address _account) public view returns (uint256) {
     return this.getVotingPowerForPeriod(BUTTERED_BREAD, _params.lastClaimedBlockNumber, block.number, _account)
       + this.getVotingPowerForPeriod(BREAD, _params.lastClaimedBlockNumber, block.number, _account);
   }
 
-  /**
-   * @notice Return the voting power for a specified user during a specified period of time
-   * @param _start Start time of the period to return the voting power for
-   * @param _end End time of the period to return the voting power for
-   * @param _account Address of user to return the voting power for
-   * @return uint256 Voting power of the specified user at the specified period of time
-   */
+  /// @inheritdoc IYieldDistributor
   function getVotingPowerForPeriod(
     ERC20VotesUpgradeable _sourceContract,
     uint256 _start,
@@ -181,13 +169,7 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
     return _totalVotingPower;
   }
 
-  /**
-   * @notice Determine if the yield distribution is available
-   * @dev Resolver function required for Powerpool job registration. For more details, see the Powerpool documentation:
-   * @dev https://docs.powerpool.finance/powerpool-and-poweragent-network/power-agent/user-guides-and-instructions/i-want-to-automate-my-tasks/job-registration-guide#resolver-job
-   * @return bool Flag indicating if the yield is able to be distributed
-   * @return bytes Calldata used by the resolver to distribute the yield
-   */
+  /// @inheritdoc IYieldDistributor
   function resolveYieldDistribution() public view returns (bool, bytes memory) {
     uint256 _available_yield = BREAD.balanceOf(address(this)) + BREAD.yieldAccrued();
     if (
@@ -203,9 +185,7 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
     }
   }
 
-  /**
-   * @notice Distribute $BREAD yield to projects based on cast votes
-   */
+  /// @inheritdoc IYieldDistributor
   function distributeYield() public {
     (bool _resolved,) = resolveYieldDistribution();
     if (!_resolved) revert YieldNotResolved();
@@ -229,16 +209,6 @@ contract YieldDistributor is IYieldDistributor, OwnableUpgradeable {
 
     delete currentVotes;
     projectDistributions = new uint256[](projects.length);
-  }
-
-  /**
-   * @notice Cast votes for the distribution of $BREAD yield
-   * @param _points List of points as integers for each project
-   */
-  function castVote(uint256[] calldata _points) public {
-    uint256 _currentVotingPower = getCurrentVotingPower(msg.sender);
-    if (_currentVotingPower < _params.minRequiredVotingPower) revert InsufficientVotingPower();
-    _castVote(msg.sender, _points, _currentVotingPower);
   }
 
   // --- Internal Utilities ---
