@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.22;
 
-import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
-import {Checkpoints} from '@openzeppelin/utils/structs/Checkpoints.sol';
-import {ERC20Votes} from '@openzeppelin/token/ERC20/extensions/ERC20Votes.sol';
+import {OwnableUpgradeable} from '@oz-upgradeable/access/OwnableUpgradeable.sol';
+import {Checkpoints} from '@oz/utils/structs/Checkpoints.sol';
+import {ERC20Votes} from '@oz/token/ERC20/extensions/ERC20Votes.sol';
 import {Bread} from '@bread-token/src/Bread.sol';
 import {IYieldDistributor} from 'interfaces/IYieldDistributor.sol';
 
