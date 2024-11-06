@@ -18,15 +18,13 @@ interface IOBDYieldDistributor {
   /// @notice The parameters for the yield distributor
   struct YieldDistributorParams {
     /// @notice The minimum number of blocks between yield distributions
-    uint256 cycleLength;
+    uint64 cycleLength;
     /// @notice The block number of the last yield distribution
-    uint256 lastClaimedBlock;
+    uint64 lastClaimedTimestamp;
     /// @notice The minimum number of vouches needed for a project to recieve yield
     uint256 minVouches;
     /// @notice The precision to use for calculations
     uint256 precision;
-    /// @notice The block number before the last yield distribution
-    uint256 prevCycleStartBlock;
   }
 
   // --- View Methods ---

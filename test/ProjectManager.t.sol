@@ -523,4 +523,5 @@ contract ProjectManagerTest is Test {
     vm.expectRevert('Invalid param1');
     projectManager.vouch(projectUidInvalid);
   }
+
 }
