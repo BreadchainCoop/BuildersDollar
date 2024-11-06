@@ -21,6 +21,7 @@ contract ProjectValidator is Initializable {
   bytes32 private constant APPLICATION_APPROVED_HASH = keccak256(bytes('Application Approved'));
 
   event ProjectValidated(bytes32 indexed approvalAttestation, address indexed recipient);
+  event VoterValidated(address indexed claimer, uint256 indexed farcasterID);
 
   function initialize(
     address _easAddress,
@@ -31,11 +32,11 @@ contract ProjectValidator is Initializable {
     __ProjectValidator_init(_easAddress, _optimismFoundationAttestors, _SEASON_DURATION, _currentSeasonExpiry);
   }
 
-  function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation) external {
+    function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation) external {
     // Scenario 2 & 4: Voucher has not vouched yet
     if (!eligibleVoter[msg.sender]) {
       // Validate the voucher's identity
-      validateOptimismVoter(identityAttestation);
+      require(validateOptimismVoter(identityAttestation, msg.sender), 'Invalid identity attestation');
       eligibleVoter[msg.sender] = true;
     }
 
@@ -116,8 +117,70 @@ contract ProjectValidator is Initializable {
     return true;
   }
 
-  function validateOptimismVoter(bytes32 identityAttestation) internal {
-    // Empty for now
+  // Function to validate the voucher's identity
+  // function temporarily public for testing
+  function validateOptimismVoter(bytes32 identityAttestation, address claimer) public returns (bool) {
+    // Get the attestation from the EAS contract
+    IEAS.Attestation memory attestation = eas.getAttestation(identityAttestation);
+    require(attestation.uid != bytes32(0), 'Attestation not found');
+
+    // Check that the attester is one of the Optimism Foundation attestors
+    bool isValidAttester = false;
+    for (uint256 i = 0; i < optimismFoundationAttestors.length; i++) {
+      if (attestation.attester == optimismFoundationAttestors[i]) {
+        isValidAttester = true;
+        break;
+      }
+    }
+    require(isValidAttester, 'Invalid attester');
+
+    // Verify that the claimer is the recipient of the attestation
+    require(attestation.recipient == claimer, 'Claimer is not the recipient of the attestation');
+
+    // Decode the data to extract the farcasterID and other fields
+    (
+      bytes32 schema,
+      address attester,
+      bool revocable,
+      uint256 time,
+      uint256 expirationTime,
+      address recipient,
+      bytes memory data,
+      uint256 revocationTime
+    ) = (
+      attestation.schema,
+      attestation.attester,
+      attestation.revocable,
+      attestation.time,
+      attestation.expirationTime,
+      attestation.recipient,
+      attestation.data,
+      attestation.revocationTime
+    );
+
+    // Decode the data according to the schema
+    (
+      uint256 farcasterID,
+      string memory round,
+      string memory voterType,
+      string memory votingGroup,
+      string memory selectionMethod
+    ) = abi.decode(data, (uint256, string, string, string, string));
+
+    // Check if the farcasterID has already been claimed
+    require(!farcasterIdClaimed[farcasterID], 'Farcaster ID has already been claimed');
+
+    // Mark the farcasterID as claimed
+    farcasterIdClaimed[farcasterID] = true;
+
+    // Emit an event (optional)
+    emit VoterValidated(claimer, farcasterID);
+
+    return true;
+  }
+
+  function getCurrentProjects() external view returns (address[] memory) {
+    return currentProjects;
   }
 
   // --- Internal Utilities ---
