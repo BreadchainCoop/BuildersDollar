@@ -2,8 +2,10 @@
 pragma solidity ^0.8.19;
 
 import 'forge-std/Test.sol';
+import {TransparentUpgradeableProxy} from '@oz/proxy/transparent/TransparentUpgradeableProxy.sol';
+import {IEAS} from 'interfaces/IEAS.sol';
 import {MockEAS} from 'mocks/MockEAS.sol';
-import 'contracts/ValidateProject.sol';
+import {ProjectValidator} from 'contracts/ProjectValidator.sol';
 
 contract ProjectValidatorTest is Test {
   ProjectValidator private validator;
@@ -23,8 +25,18 @@ contract ProjectValidatorTest is Test {
     optimismFoundationAttestors[0] = optimismFoundation1;
     optimismFoundationAttestors[1] = optimismFoundation2;
 
-    validator =
-      new ProjectValidator(address(mockEAS), optimismFoundationAttestors, SEASON_DURATION, currentSeasonExpiry);
+    bytes memory _initData = abi.encodeWithSelector(
+      ProjectValidator.initialize.selector,
+      address(mockEAS),
+      optimismFoundationAttestors,
+      SEASON_DURATION,
+      currentSeasonExpiry
+    );
+
+    address validatorImp = address(new ProjectValidator());
+    address _validatorProxy = address(new TransparentUpgradeableProxy(validatorImp, address(this), _initData));
+
+    validator = ProjectValidator(_validatorProxy);
   }
 
   function testValidateProjectSuccess() public {
@@ -46,7 +58,7 @@ contract ProjectValidatorTest is Test {
     bool result = validator.validateProject(uid);
     assertTrue(result, 'Validation should return true');
 
-    bool isEligible = validator.eligibleProjects(uid);
+    bool isEligible = validator.eligibleProject(uid);
     assertTrue(isEligible, 'Project should be eligible');
   }
 
@@ -72,7 +84,7 @@ contract ProjectValidatorTest is Test {
     bool secondResult = validator.validateProject(uid);
     assertTrue(secondResult, 'Second validation should return true even if already included');
 
-    bool isEligible = validator.eligibleProjects(uid);
+    bool isEligible = validator.eligibleProject(uid);
     assertTrue(isEligible, 'Project should still be eligible');
   }
 
