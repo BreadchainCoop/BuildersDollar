@@ -27,13 +27,6 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   address[] public queuedProjectsForAddition;
   /// @notice Array of projects queued for removal from the next cycle
   address[] public queuedProjectsForRemoval;
-  /// @notice The voting power allocated to projects by voters in the current cycle
-  uint256[] public projectDistributions;
-
-  /// @inheritdoc IOBDYieldDistributor
-  mapping(address => uint256) public accountLastVoted;
-  /// @notice The voting power allocated to projects by voters in the current cycle
-  mapping(address => uint256[]) internal _voterDistributions;
 
   // --- Initializer ---
 
@@ -52,9 +45,9 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
 
     BASE_TOKEN = BuildersDollar(_baseToken);
     _params = __params;
+    _params.prevCycleStartBlock = 0;
 
     uint256 _l = _initialProjects.length;
-    projectDistributions = new uint256[](_l);
     projects = new address[](_l);
     for (uint256 i; i < _l; ++i) {
       projects[i] = _initialProjects[i];
@@ -68,16 +61,12 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
     return _params;
   }
 
-  /// @inheritdoc IOBDYieldDistributor
-  function getCurrentVotingDistribution() external view returns (address[] memory, uint256[] memory) {
-    return (projects, projectDistributions);
-  }
-
   // --- External Methods ---
 
   /// @inheritdoc IOBDYieldDistributor
-  function vouch() external {
-    _vouch(msg.sender);
+  // TODO: add delegate access control
+  function vouch(address _project) external {
+    _vouch(msg.sender, _project);
   }
 
   /// @inheritdoc IOBDYieldDistributor
@@ -109,46 +98,38 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
 
   /// @inheritdoc IOBDYieldDistributor
   function resolveYieldDistribution() public view returns (bool _b, bytes memory _data) {
-    if (_params.currentVouches > 0 && block.number > _params.lastClaimedBlock + _params.cycleLength) {
-      uint256 _currentYield =
-        (BASE_TOKEN.balanceOf(address(this)) + BASE_TOKEN.yieldAccrued()) / _params.yieldFixedSplitDivisor;
+    if (block.number > _params.lastClaimedBlock + _params.cycleLength) {
+      uint256 _l = projects.length;
+      uint256 _currYield = (BASE_TOKEN.balanceOf(address(this)) + BASE_TOKEN.yieldAccrued()) / _l;
 
-      if (_currentYield >= projects.length) {
+      if (_l > 0 && _currYield >= _l) {
+        uint256 _yieldPerProject = _currYield / _l;
         _b = true;
-        _data = abi.encodePacked(IOBDYieldDistributor.distributeYield.selector);
+        _data = abi.encodeWithSelector(IOBDYieldDistributor.distributeYield.selector, abi.encode(_yieldPerProject));
       }
     }
   }
 
   /// @inheritdoc IOBDYieldDistributor
-  function distributeYield() public {
-    (bool _resolved,) = resolveYieldDistribution();
-    if (!_resolved) revert YieldNotResolved();
-
+  function distributeYield(bytes calldata _payload) public {
+    (uint256 _yieldPerProject, uint256 _l) = abi.decode(_payload, (uint256, uint256));
     BASE_TOKEN.claimYield(BASE_TOKEN.yieldAccrued());
+
     _params.prevCycleStartBlock = _params.lastClaimedBlock;
     _params.lastClaimedBlock = block.number;
-    uint256 balance = BASE_TOKEN.balanceOf(address(this));
-    uint256 _fixedYield = balance / _params.yieldFixedSplitDivisor;
-    uint256 _baseSplit = _fixedYield / projects.length;
-    uint256 _votedYield = balance - _fixedYield;
 
-    for (uint256 i; i < projects.length; ++i) {
-      uint256 _votedSplit =
-        ((projectDistributions[i] * _votedYield * _params.precision) / _params.currentVouches) / _params.precision;
-      BASE_TOKEN.transfer(projects[i], _votedSplit + _baseSplit);
+    for (uint256 i; i < _l; ++i) {
+      BASE_TOKEN.transfer(projects[i], _yieldPerProject);
     }
 
     _updateBreadchainProjects();
-    emit YieldDistributed(balance, _params.currentVouches, projectDistributions);
-
-    delete _params.currentVouches;
-    projectDistributions = new uint256[](projects.length);
+    emit YieldDistributed(_yieldPerProject, projects);
   }
 
   // --- Internal Utilities ---
 
-  function _vouch(address _delegate) internal {}
+  /// @notice Internal function for vouching for a project
+  function _vouch(address _delegate, address _project) internal {}
 
   /// @notice Internal function for updating the project list
   function _updateBreadchainProjects() internal {
@@ -173,8 +154,7 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   /// @notice see IOBDYieldDistributor
   function _modifyParam(bytes32 _param, uint256 _value) internal {
     if (_param == 'cycleLength') _params.cycleLength = _value;
-    else if (_param == 'maxVouches') _params.maxVouches = _value;
-    else if (_param == 'yieldFixedSplitDivisor') _params.yieldFixedSplitDivisor = _value;
+    else if (_param == 'minVouches') _params.minVouches = _value;
     else revert InvalidParam();
   }
 
@@ -204,11 +184,9 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
 
   /// @notice Modifier to enforce the parameters for the yield distributor
   modifier enforceParams(YieldDistributorParams memory _ydp) {
-    if (
-      _ydp.precision == 0 || _ydp.maxVouches == 0 || _ydp.cycleLength == 0 || _ydp.yieldFixedSplitDivisor == 0
-        || _ydp.lastClaimedBlock == 0
-    ) revert ZeroValue();
-    if (_ydp.currentVouches != 0 || _ydp.prevCycleStartBlock != 0) revert InvalidParam();
+    if (_ydp.precision == 0 || _ydp.minVouches == 0 || _ydp.cycleLength == 0 || _ydp.lastClaimedBlock == 0) {
+      revert ZeroValue();
+    }
     _;
   }
 }

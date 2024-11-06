@@ -17,6 +17,8 @@ interface IOBDYieldDistributor {
   error YieldNotResolved();
   /// @notice The error emitted when a modifier param is invalid
   error InvalidParam();
+  /// @notice The error emitted the payload amount does not match the contract balance
+  error InvalidYield();
 
   /// @notice The event emitted when an account casts a vote
   event MemberVouched(address indexed account, address[] projects);
@@ -25,24 +27,20 @@ interface IOBDYieldDistributor {
   /// @notice The event emitted when a project is removed as eligibile for yield distribution
   event ProjectRemoved(address project);
   /// @notice The event emitted when yield is distributed
-  event YieldDistributed(uint256 yield, uint256 totalVotes, uint256[] projectDistributions);
+  event YieldDistributed(uint256 yield, address[] projects);
 
   /// @notice The parameters for the yield distributor
   struct YieldDistributorParams {
-    /// @notice The total number of votes cast in the current cycle
-    uint256 currentVouches;
     /// @notice The minimum number of blocks between yield distributions
     uint256 cycleLength;
     /// @notice The block number of the last yield distribution
     uint256 lastClaimedBlock;
-    /// @notice The maximum number of points a voter can allocate to a project
-    uint256 maxVouches;
+    /// @notice The minimum number of vouches needed for a project to recieve yield
+    uint256 minVouches;
     /// @notice The precision to use for calculations
     uint256 precision;
     /// @notice The block number before the last yield distribution
     uint256 prevCycleStartBlock;
-    /// @notice Amount of the yield is divided equally among projects
-    uint256 yieldFixedSplitDivisor;
   }
 
   // --- View Methods ---
@@ -53,22 +51,16 @@ interface IOBDYieldDistributor {
    */
   function BASE_TOKEN() external view returns (BuildersDollar);
 
-  /// @return uint256 The last block number in which a specified account cast a vote
-  function accountLastVoted(address) external view returns (uint256);
-
   /// @return YieldDistributorParams The current params of the YieldDistributor
   function params() external view returns (YieldDistributorParams memory);
 
-  /**
-   * @return address[] The current eligible member projects
-   * @return uint256[] The current distribution of voting power for projects
-   */
-  function getCurrentVotingDistribution() external view returns (address[] memory, uint256[] memory);
-
   // --- Methods ---
 
-  /// @notice Cast vouch for the distribution of $BREAD yield
-  function vouch() external;
+  /**
+   * @notice Cast vouch for the distribution of $BREAD yield
+   * @param _project Project to vouch for
+   */
+  function vouch(address _project) external;
 
   /**
    * @notice Queue a new project to be added to the project list
@@ -105,6 +97,9 @@ interface IOBDYieldDistributor {
    */
   function resolveYieldDistribution() external view returns (bool, bytes memory);
 
-  /// @notice Distribute $OBD yield to projects based on vouches
-  function distributeYield() external;
+  /**
+   * @notice Distribute $OBD yield to projects based on vouches
+   * @param _payload Calldata used by the resolver to distribute the yield
+   */
+  function distributeYield(bytes calldata _payload) external;
 }
