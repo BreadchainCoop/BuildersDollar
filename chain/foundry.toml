@@ -15,4 +15,7 @@ lib = "lib"
 via_ir = true
 
 [rpc_endpoints]
+gnosis = "https://rpc.gnosis.gateway.fm"
+optimism = "https://mainnet.optimism.io"
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
