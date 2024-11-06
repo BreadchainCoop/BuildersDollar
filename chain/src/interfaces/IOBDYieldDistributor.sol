@@ -32,21 +32,15 @@ interface IOBDYieldDistributor {
   // --- View Methods ---
 
   /**
-   * @dev BASE_TOKEN is an implementation of BREAD
+   * @dev token is an implementation of BuildersDollar
    * @return BuildersDollar The address of the $BASE_TOKEN token contract
    */
-  function BASE_TOKEN() external view returns (BuildersDollar);
+  function token() external view returns (BuildersDollar);
 
   /// @return YieldDistributorParams The current params of the YieldDistributor
   function params() external view returns (YieldDistributorParams memory);
 
   // --- Methods ---
-
-  /**
-   * @notice Cast vouch for the distribution of $BREAD yield
-   * @param _project Project to vouch for
-   */
-  function vouch(address _project) external;
 
   /**
    * @notice Set param to updated value

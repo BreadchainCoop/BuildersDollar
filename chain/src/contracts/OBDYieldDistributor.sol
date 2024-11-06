@@ -11,21 +11,16 @@ import {ProjectValidator} from 'contracts/ProjectValidator.sol';
  * @notice Distribute $OBD yield to eligible member currentProjects based on a voted distribution
  * @author Breadchain Collective
  */
-contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
+contract OBDYieldDistributor is ProjectValidator, OwnableUpgradeable, IOBDYieldDistributor {
   // --- Registry ---
 
   /// @inheritdoc IOBDYieldDistributor
   BuildersDollar public token;
-  /// @inheritdoc IOBDYieldDistributor
-  ProjectValidator public projectValidator;
 
   // --- Data ---
 
   /// @notice IOBDYieldDistributor
   YieldDistributorParams internal _params;
-
-  /// @notice Array of currentProjects eligible for yield distribution
-  address[] public currentProjects;
 
   // --- Initializer ---
 
@@ -34,15 +29,18 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
     _disableInitializers();
   }
 
-  function initialize(address _baseToken, address _projectValidator, YieldDistributorParams memory __params)
-    public
-    initializer
-    enforceParams(__params)
-    noZeroAddr(_baseToken)
-  {
+  function initialize(
+    address _token,
+    address _eas,
+    uint256 _seasonDuration,
+    uint256 _currentSeasonExpiry,
+    YieldDistributorParams memory __params,
+    address[] memory _OPattestors
+  ) public initializer enforceParams(__params) noZeroAddr(_token) {
     __Ownable_init(msg.sender);
+    __ProjectValidator_init(_eas, _OPattestors, _seasonDuration, _currentSeasonExpiry);
 
-    token = BuildersDollar(_baseToken);
+    token = BuildersDollar(_token);
     _params = __params;
     _params.prevCycleStartBlock = 0;
   }
@@ -55,20 +53,6 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   }
 
   // --- External Methods ---
-
-  /// @inheritdoc IOBDYieldDistributor
-  function vouch(bytes32 _projectAttestation) external {
-    // TODO function validateExistingOPVoter
-    validateProject(_projectAttestation);
-    _vouch(_projectAttestation);
-  }
-
-  /// @inheritdoc IOBDYieldDistributor
-  function vouch(bytes32 _projectAttestation, bytes32 idAttestation) external {
-    // TODO function validateNewOPVoter
-    validateProject(_projectAttestation);
-    _vouch(_projectAttestation);
-  }
 
   /// @inheritdoc IOBDYieldDistributor
   function modifyParam(bytes32 _param, uint256 _value) external onlyOwner {
@@ -112,11 +96,6 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   }
 
   // --- Internal Utilities ---
-
-  /// @notice Internal function for vouching for a project
-  function _vouch(address _delegate, address _project) internal {
-    // TODO: keep track of vouches
-  }
 
   /// @notice see IOBDYieldDistributor
   function _modifyParam(bytes32 _param, uint256 _value) internal {
