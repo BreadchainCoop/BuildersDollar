@@ -11,12 +11,11 @@ contract ProjectManager is Initializable {
   uint256 public SEASON_DURATION;
   uint256 public currentSeasonExpiry;
   uint256 public minRequiredVouches;
-  
+
   address[] public currentProjects;
   mapping(address => bool) public eligibleVoter; // Tracks both eligibility and if they have vouched
   mapping(address => uint256) public projectToExpiry;
   mapping(bytes32 => address) public eligibleProject;
-
 
   bytes32 private constant GRANTEE_HASH = keccak256(bytes('Grantee'));
   bytes32 private constant APPLICATION_APPROVED_HASH = keccak256(bytes('Application Approved'));
@@ -54,7 +53,6 @@ contract ProjectManager is Initializable {
     if (eligibleProject[projectApprovalAttestation] == address(0)) {
       // Validate the project's validity
       validateProject(projectApprovalAttestation);
-
     }
   }
 
@@ -149,7 +147,7 @@ contract ProjectManager is Initializable {
       string memory selectionMethod
     ) = abi.decode(data, (uint256, string, string, string, string));
 
-      eligibleVoter[claimer] = true;
+    eligibleVoter[claimer] = true;
 
     // Emit an event (optional)
     emit VoterValidated(claimer, farcasterID);

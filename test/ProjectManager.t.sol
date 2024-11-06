@@ -83,7 +83,6 @@ contract ProjectManagerTest is Test {
 
     bool secondResult = projectManager.validateProject(uid);
     assertTrue(secondResult, 'Second validation should return true even if already included');
-
   }
 
   function testValidateProjectInvalidAttester() public {
@@ -213,9 +212,7 @@ contract ProjectManagerTest is Test {
 
     // Call validateOptimismVoter
     projectManager.validateOptimismVoter(uid, address(this));
-
   }
-
 
   function testValidateOptimismVoterInvalidAttester() public {
     bytes32 uid = keccak256(abi.encodePacked('identity-attestation'));
