@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import {Initializable} from '@oz-upgradeable/proxy/utils/Initializable.sol';
 import 'interfaces/IEAS.sol';
 
-contract ProjectValidator is Initializable {
+contract ProjectManager is Initializable {
   IEAS public eas;
   address[] public optimismFoundationAttestors;
 
@@ -29,7 +29,7 @@ contract ProjectValidator is Initializable {
     uint256 _SEASON_DURATION,
     uint256 _currentSeasonExpiry
   ) public initializer {
-    __ProjectValidator_init(_easAddress, _optimismFoundationAttestors, _SEASON_DURATION, _currentSeasonExpiry);
+    __ProjectManager_init(_easAddress, _optimismFoundationAttestors, _SEASON_DURATION, _currentSeasonExpiry);
   }
 
   function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation) public virtual {
@@ -185,7 +185,7 @@ contract ProjectValidator is Initializable {
 
   // --- Internal Utilities ---
 
-  function __ProjectValidator_init(
+  function __ProjectManager_init(
     address _easAddress,
     address[] memory _optimismFoundationAttestors,
     uint256 _SEASON_DURATION,

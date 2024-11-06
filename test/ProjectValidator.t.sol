@@ -5,10 +5,10 @@ import 'forge-std/Test.sol';
 import {TransparentUpgradeableProxy} from '@oz/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {IEAS} from 'interfaces/IEAS.sol';
 import {MockEAS} from 'mocks/MockEAS.sol';
-import {ProjectValidator} from 'contracts/ProjectValidator.sol';
+import {ProjectManager} from 'contracts/ProjectManager.sol';
 
-contract ProjectValidatorTest is Test {
-  ProjectValidator private validator;
+contract ProjectManagerTest is Test {
+  ProjectManager private validator;
   MockEAS private mockEAS;
   address private optimismFoundation1 = address(0x123);
   address private optimismFoundation2 = address(0x456);
@@ -26,17 +26,17 @@ contract ProjectValidatorTest is Test {
     optimismFoundationAttestors[1] = optimismFoundation2;
 
     bytes memory _initData = abi.encodeWithSelector(
-      ProjectValidator.initialize.selector,
+      ProjectManager.initialize.selector,
       address(mockEAS),
       optimismFoundationAttestors,
       SEASON_DURATION,
       currentSeasonExpiry
     );
 
-    address validatorImp = address(new ProjectValidator());
+    address validatorImp = address(new ProjectManager());
     address _validatorProxy = address(new TransparentUpgradeableProxy(validatorImp, address(this), _initData));
 
-    validator = ProjectValidator(_validatorProxy);
+    validator = ProjectManager(_validatorProxy);
   }
 
   function testValidateProjectSuccess() public {

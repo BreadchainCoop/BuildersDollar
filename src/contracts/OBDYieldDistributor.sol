@@ -4,14 +4,14 @@ pragma solidity 0.8.22;
 import {OwnableUpgradeable} from '@oz-upgradeable/access/OwnableUpgradeable.sol';
 import {BuildersDollar} from '@bdtoken/BuildersDollar.sol';
 import {IOBDYieldDistributor} from 'interfaces/IOBDYieldDistributor.sol';
-import {ProjectValidator} from 'contracts/ProjectValidator.sol';
+import {ProjectManager} from 'contracts/ProjectManager.sol';
 
 /**
  * @title OBD Yield Distributor
  * @notice Distribute $OBD yield to eligible member currentProjects based on a voted distribution
  * @author Breadchain Collective
  */
-contract OBDYieldDistributor is ProjectValidator, OwnableUpgradeable, IOBDYieldDistributor {
+contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDistributor {
   // --- Registry ---
 
   /// @inheritdoc IOBDYieldDistributor
@@ -38,7 +38,7 @@ contract OBDYieldDistributor is ProjectValidator, OwnableUpgradeable, IOBDYieldD
     address[] memory _OPattestors
   ) public initializer enforceParams(__params) noZeroAddr(_token) {
     __Ownable_init(msg.sender);
-    __ProjectValidator_init(_eas, _OPattestors, _seasonDuration, _currentSeasonExpiry);
+    __ProjectManager_init(_eas, _OPattestors, _seasonDuration, _currentSeasonExpiry);
 
     token = BuildersDollar(_token);
     _params = __params;
@@ -57,20 +57,20 @@ contract OBDYieldDistributor is ProjectValidator, OwnableUpgradeable, IOBDYieldD
   /// @inheritdoc IOBDYieldDistributor
   function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation)
     public
-    override(ProjectValidator, IOBDYieldDistributor)
+    override(ProjectManager, IOBDYieldDistributor)
   {
     super.vouch(projectApprovalAttestation, identityAttestation);
   }
 
   /// @inheritdoc IOBDYieldDistributor
-  function vouch(bytes32 projectApprovalAttestation) public override(ProjectValidator, IOBDYieldDistributor) {
+  function vouch(bytes32 projectApprovalAttestation) public override(ProjectManager, IOBDYieldDistributor) {
     super.vouch(projectApprovalAttestation);
   }
 
   /// @inheritdoc IOBDYieldDistributor
   function validateProject(bytes32 approvalAttestation)
     public
-    override(ProjectValidator, IOBDYieldDistributor)
+    override(ProjectManager, IOBDYieldDistributor)
     returns (bool)
   {
     return super.validateProject(approvalAttestation);
