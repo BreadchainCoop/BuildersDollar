@@ -10,12 +10,13 @@ contract ProjectManager is Initializable {
 
   uint256 public SEASON_DURATION;
   uint256 public currentSeasonExpiry;
-
+  uint256 public minRequiredVouches;
+  
   address[] public currentProjects;
-  mapping(uint256 => bool) public farcasterIdClaimed;
   mapping(address => bool) public eligibleVoter; // Tracks both eligibility and if they have vouched
   mapping(address => uint256) public projectToExpiry;
-  mapping(bytes32 => bool) public eligibleProject;
+  mapping(bytes32 => address) public eligibleProject;
+
 
   bytes32 private constant GRANTEE_HASH = keccak256(bytes('Grantee'));
   bytes32 private constant APPLICATION_APPROVED_HASH = keccak256(bytes('Application Approved'));
@@ -37,24 +38,10 @@ contract ProjectManager is Initializable {
     if (!eligibleVoter[msg.sender]) {
       // Validate the voucher's identity
       require(validateOptimismVoter(identityAttestation, msg.sender), 'Invalid identity attestation');
-      eligibleVoter[msg.sender] = true;
     }
-
     // Check if the project has been vouched for
-    if (!eligibleProject[projectApprovalAttestation]) {
-      // Validate the project's validity
+    if (eligibleProject[projectApprovalAttestation] == address(0)) {
       validateProject(projectApprovalAttestation);
-
-      // Get the project address from the attestation
-      IEAS.Attestation memory attestation = eas.getAttestation(projectApprovalAttestation);
-      address projectAddress = attestation.recipient;
-
-      // Add the project to currentProjects if not already included
-      currentProjects.push(projectAddress);
-
-      // Mark the project as eligible and set expiry
-      eligibleProject[projectApprovalAttestation] = true;
-      projectToExpiry[projectAddress] = currentSeasonExpiry;
     }
   }
 
@@ -64,26 +51,16 @@ contract ProjectManager is Initializable {
     require(eligibleVoter[msg.sender], 'Identity attestation required for first-time vouchers');
 
     // Check if the project has been vouched for
-    if (!eligibleProject[projectApprovalAttestation]) {
+    if (eligibleProject[projectApprovalAttestation] == address(0)) {
       // Validate the project's validity
       validateProject(projectApprovalAttestation);
 
-      // Get the project address from the attestation
-      IEAS.Attestation memory attestation = eas.getAttestation(projectApprovalAttestation);
-      address projectAddress = attestation.recipient;
-
-      // Add the project to currentProjects if not already included
-      currentProjects.push(projectAddress);
-
-      // Mark the project as eligible and set expiry
-      eligibleProject[projectApprovalAttestation] = true;
-      projectToExpiry[projectAddress] = currentSeasonExpiry;
     }
   }
 
   // Function to validate the project's attestation
   function validateProject(bytes32 approvalAttestation) public virtual returns (bool) {
-    if (eligibleProject[approvalAttestation]) {
+    if (eligibleProject[approvalAttestation] != address(0)) {
       return true;
     }
 
@@ -110,9 +87,14 @@ contract ProjectManager is Initializable {
 
     require(keccak256(bytes(param1)) == GRANTEE_HASH, 'Invalid param1');
     require(keccak256(bytes(param5)) == APPLICATION_APPROVED_HASH, 'Invalid param5');
-
-    eligibleProject[approvalAttestation] = true;
-    emit ProjectValidated(approvalAttestation, attestation.recipient);
+    address projectAddress = attestation.recipient;
+    eligibleProject[approvalAttestation] = projectAddress;
+    // Add the project to currentProjects if not already included
+    currentProjects.push(projectAddress);
+    // Mark the project as eligible and set expiry
+    eligibleProject[approvalAttestation] = projectAddress;
+    projectToExpiry[projectAddress] = currentSeasonExpiry;
+    emit ProjectValidated(approvalAttestation, projectAddress);
 
     return true;
   }
@@ -167,11 +149,7 @@ contract ProjectManager is Initializable {
       string memory selectionMethod
     ) = abi.decode(data, (uint256, string, string, string, string));
 
-    // Check if the farcasterID has already been claimed
-    require(!farcasterIdClaimed[farcasterID], 'Farcaster ID has already been claimed');
-
-    // Mark the farcasterID as claimed
-    farcasterIdClaimed[farcasterID] = true;
+      eligibleVoter[claimer] = true;
 
     // Emit an event (optional)
     emit VoterValidated(claimer, farcasterID);

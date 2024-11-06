@@ -8,7 +8,7 @@ import {MockEAS} from 'mocks/MockEAS.sol';
 import {ProjectManager} from 'contracts/ProjectManager.sol';
 
 contract ProjectManagerTest is Test {
-  ProjectManager private validator;
+  ProjectManager private projectManager;
   MockEAS private mockEAS;
   address private optimismFoundation1 = address(0x123);
   address private optimismFoundation2 = address(0x456);
@@ -33,10 +33,10 @@ contract ProjectManagerTest is Test {
       currentSeasonExpiry
     );
 
-    address validatorImp = address(new ProjectManager());
-    address _validatorProxy = address(new TransparentUpgradeableProxy(validatorImp, address(this), _initData));
+    address projectManagerImp = address(new ProjectManager());
+    address _projectManagerProxy = address(new TransparentUpgradeableProxy(projectManagerImp, address(this), _initData));
 
-    validator = ProjectManager(_validatorProxy);
+    projectManager = ProjectManager(_projectManagerProxy);
   }
 
   function testValidateProjectSuccess() public {
@@ -55,11 +55,11 @@ contract ProjectManagerTest is Test {
     });
     mockEAS.setAttestation(uid, attestation);
 
-    bool result = validator.validateProject(uid);
+    bool result = projectManager.validateProject(uid);
     assertTrue(result, 'Validation should return true');
 
-    bool isEligible = validator.eligibleProject(uid);
-    assertTrue(isEligible, 'Project should be eligible');
+    address isEligible = projectManager.eligibleProject(uid);
+    assertNotEq(isEligible, address(0), 'Project should be marked as eligible');
   }
 
   function testValidateProjectAlreadyIncluded() public {
@@ -78,14 +78,12 @@ contract ProjectManagerTest is Test {
     });
     mockEAS.setAttestation(uid, attestation);
 
-    bool firstResult = validator.validateProject(uid);
+    bool firstResult = projectManager.validateProject(uid);
     assertTrue(firstResult, 'First validation should return true');
 
-    bool secondResult = validator.validateProject(uid);
+    bool secondResult = projectManager.validateProject(uid);
     assertTrue(secondResult, 'Second validation should return true even if already included');
 
-    bool isEligible = validator.eligibleProject(uid);
-    assertTrue(isEligible, 'Project should still be eligible');
   }
 
   function testValidateProjectInvalidAttester() public {
@@ -108,7 +106,7 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(uid, attestation);
 
     vm.expectRevert('Invalid attester');
-    validator.validateProject(uid);
+    projectManager.validateProject(uid);
   }
 
   function testValidateProjectNotInCurrentSeason() public {
@@ -131,7 +129,7 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(uidEarly, attestationEarly);
 
     vm.expectRevert('Attestation not in current season');
-    validator.validateProject(uidEarly);
+    projectManager.validateProject(uidEarly);
 
     // Attestation after the season end
     bytes32 uidLate = keccak256(abi.encodePacked('test-attestation-late'));
@@ -150,7 +148,7 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(uidLate, attestationLate);
 
     vm.expectRevert('Attestation not in current season');
-    validator.validateProject(uidLate);
+    projectManager.validateProject(uidLate);
   }
 
   function testValidateProjectInvalidParam1() public {
@@ -170,7 +168,7 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(uid, attestation);
 
     vm.expectRevert('Invalid param1');
-    validator.validateProject(uid);
+    projectManager.validateProject(uid);
   }
 
   function testValidateProjectInvalidParam5() public {
@@ -190,7 +188,7 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(uid, attestation);
 
     vm.expectRevert('Invalid param5');
-    validator.validateProject(uid);
+    projectManager.validateProject(uid);
   }
 
   function testValidateOptimismVoterSuccess() public {
@@ -214,56 +212,10 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(uid, attestation);
 
     // Call validateOptimismVoter
-    validator.validateOptimismVoter(uid, address(this));
+    projectManager.validateOptimismVoter(uid, address(this));
 
-    // Check that the farcasterID is marked as claimed
-    bool claimed = validator.farcasterIdClaimed(farcasterID);
-    assertTrue(claimed, 'Farcaster ID should be marked as claimed');
   }
 
-  function testValidateOptimismVoterAlreadyClaimed() public {
-    // Prepare the attestation
-    bytes32 uid = keccak256(abi.encodePacked('identity-attestation'));
-    uint256 farcasterID = 12_345;
-
-    IEAS.Attestation memory attestation = IEAS.Attestation({
-      uid: uid,
-      schema: bytes32(0),
-      refUID: bytes32(0),
-      time: 1500,
-      expirationTime: 0,
-      revocationTime: 0,
-      recipient: address(this),
-      attester: optimismFoundation1,
-      revocable: true,
-      data: abi.encode(farcasterID, 'round', 'voterType', 'votingGroup', 'selectionMethod')
-    });
-
-    mockEAS.setAttestation(uid, attestation);
-
-    // First validation
-    validator.validateOptimismVoter(uid, address(this));
-
-    // Second validation with same farcasterID but different uid
-    bytes32 uid2 = keccak256(abi.encodePacked('identity-attestation-2'));
-    IEAS.Attestation memory attestation2 = IEAS.Attestation({
-      uid: uid2,
-      schema: bytes32(0),
-      refUID: bytes32(0),
-      time: 1500,
-      expirationTime: 0,
-      revocationTime: 0,
-      recipient: address(0xabc),
-      attester: optimismFoundation1,
-      revocable: true,
-      data: abi.encode(farcasterID, 'round', 'voterType', 'votingGroup', 'selectionMethod')
-    });
-
-    mockEAS.setAttestation(uid2, attestation2);
-
-    vm.expectRevert('Farcaster ID has already been claimed');
-    validator.validateOptimismVoter(uid2, address(0xabc));
-  }
 
   function testValidateOptimismVoterInvalidAttester() public {
     bytes32 uid = keccak256(abi.encodePacked('identity-attestation'));
@@ -287,7 +239,7 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(uid, attestation);
 
     vm.expectRevert('Invalid attester');
-    validator.validateOptimismVoter(uid, address(this));
+    projectManager.validateOptimismVoter(uid, address(this));
   }
 
   function testValidateOptimismVoterInvalidRecipient() public {
@@ -310,14 +262,14 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(uid, attestation);
 
     vm.expectRevert('Claimer is not the recipient of the attestation');
-    validator.validateOptimismVoter(uid, address(this));
+    projectManager.validateOptimismVoter(uid, address(this));
   }
 
   function testValidateOptimismVoterAttestationNotFound() public {
     bytes32 uid = keccak256(abi.encodePacked('non-existent-attestation'));
 
     vm.expectRevert('Attestation not found');
-    validator.validateOptimismVoter(uid, address(this));
+    projectManager.validateOptimismVoter(uid, address(this));
   }
 
   // Now, tests for vouch functions covering the four scenarios
@@ -362,18 +314,18 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(projectUid, projectAttestation);
 
     // Call vouch with both attestations
-    validator.vouch(projectUid, identityUid);
+    projectManager.vouch(projectUid, identityUid);
 
     // Check that eligibleVoter is updated
-    bool isEligible = validator.eligibleVoter(address(this));
+    bool isEligible = projectManager.eligibleVoter(address(this));
     assertTrue(isEligible, 'Voter should be marked as eligible');
 
     // Check that the project is now eligible
-    bool isProjectEligible = validator.eligibleProject(projectUid);
-    assertTrue(isProjectEligible, 'Project should be marked as eligible');
+    address isProjectEligible = projectManager.eligibleProject(projectUid);
+    assertNotEq(isProjectEligible, address(0), 'Project should be marked as eligible');
 
     // Check that the project is added to currentProjects
-    address[] memory projects = validator.getCurrentProjects();
+    address[] memory projects = projectManager.getCurrentProjects();
     assertEq(projects[0], address(0x789), 'The project address should be correct');
   }
 
@@ -421,7 +373,7 @@ contract ProjectManagerTest is Test {
 
     // otherUser vouches for the project
     vm.prank(otherUser);
-    validator.vouch(projectUid, identityUidOther);
+    projectManager.vouch(projectUid, identityUidOther);
 
     // Now, address(this) wants to vouch
     // Prepare identity attestation for address(this)
@@ -444,18 +396,18 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(identityUid, identityAttestation);
 
     // Call vouch with identity attestation
-    validator.vouch(projectUid, identityUid);
+    projectManager.vouch(projectUid, identityUid);
 
     // Check that eligibleVoter is updated
-    bool isEligible = validator.eligibleVoter(address(this));
+    bool isEligible = projectManager.eligibleVoter(address(this));
     assertTrue(isEligible, 'Voter should be marked as eligible');
 
     // Check that the project is still eligible
-    bool isProjectEligible = validator.eligibleProject(projectUid);
-    assertTrue(isProjectEligible, 'Project should be marked as eligible');
+    address isProjectEligible = projectManager.eligibleProject(projectUid);
+    assertNotEq(isProjectEligible, address(0), 'Project should be marked as eligible');
 
     // Check that the project is in currentProjects only once
-    address[] memory projects = validator.getCurrentProjects();
+    address[] memory projects = projectManager.getCurrentProjects();
     assertEq(projects.length, 1, 'There should be one project in currentProjects');
   }
 
@@ -483,14 +435,14 @@ contract ProjectManagerTest is Test {
     mockEAS.setAttestation(projectUidNew, projectAttestationNew);
 
     // Call vouch with only project attestation
-    validator.vouch(projectUidNew);
+    projectManager.vouch(projectUidNew);
 
     // Check that the new project is now eligible
-    bool isProjectEligible = validator.eligibleProject(projectUidNew);
-    assertTrue(isProjectEligible, 'New project should be marked as eligible');
+    address isProjectEligible = projectManager.eligibleProject(projectUidNew);
+    assertNotEq(isProjectEligible, address(0), 'New project should be marked as eligible');
 
     // Check that both projects are in currentProjects
-    address[] memory projects = validator.getCurrentProjects();
+    address[] memory projects = projectManager.getCurrentProjects();
     assertEq(projects.length, 2, 'There should be two projects in currentProjects');
   }
 
@@ -502,19 +454,20 @@ contract ProjectManagerTest is Test {
     // Now, address(this) wants to vouch for the same project
     // Since they've already vouched, they only need to call vouch with project attestation
     bytes32 projectUid = keccak256(abi.encodePacked('project-attestation'));
-    validator.vouch(projectUid);
+    projectManager.vouch(projectUid);
 
     // No changes should occur, but function should not revert
     // Check that eligibleVoter is still true
-    bool isEligible = validator.eligibleVoter(address(this));
+    bool isEligible = projectManager.eligibleVoter(address(this));
     assertTrue(isEligible, 'Voter should be marked as eligible');
 
     // Check that the project is still eligible
-    bool isProjectEligible = validator.eligibleProject(projectUid);
-    assertTrue(isProjectEligible, 'Project should be marked as eligible');
+    address isProjectEligible = projectManager.eligibleProject(projectUid);
+    // check that the address is not the zero address
+    assertNotEq(isProjectEligible, address(0), 'Project should be marked as eligible');
 
     // Check that project is not duplicated in currentProjects
-    address[] memory projects = validator.getCurrentProjects();
+    address[] memory projects = projectManager.getCurrentProjects();
     assertEq(projects.length, 1, 'There should be one project in currentProjects');
   }
 
@@ -542,7 +495,7 @@ contract ProjectManagerTest is Test {
 
     // Call vouch without identity attestation
     vm.expectRevert('Identity attestation required for first-time vouchers');
-    validator.vouch(projectUid);
+    projectManager.vouch(projectUid);
   }
 
   function testVouchAlreadyVouchedInvalidProjectAttestation() public {
@@ -570,6 +523,6 @@ contract ProjectManagerTest is Test {
 
     // Call vouch with invalid project attestation
     vm.expectRevert('Invalid param1');
-    validator.vouch(projectUidInvalid);
+    projectManager.vouch(projectUidInvalid);
   }
 }
