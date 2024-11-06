@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.22;
 
-import 'interfaces/IEAS.sol';
+import {IEAS} from 'interfaces/IEAS.sol';
 
 contract ProjectValidator {
   IEAS public eas;
@@ -72,6 +72,9 @@ contract ProjectValidator {
 
     // Mark the project as eligible
     eligibleProjects[approvalAttestation] = true;
+
+    // OBDYieldDistributor
+    // TODO: Add project to list of eligible projects
 
     // Emit event
     emit ProjectValidated(approvalAttestation, attestation.recipient);

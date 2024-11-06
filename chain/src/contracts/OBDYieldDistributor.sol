@@ -4,29 +4,28 @@ pragma solidity 0.8.22;
 import {OwnableUpgradeable} from '@oz-upgradeable/access/OwnableUpgradeable.sol';
 import {BuildersDollar} from '@bdtoken/BuildersDollar.sol';
 import {IOBDYieldDistributor} from 'interfaces/IOBDYieldDistributor.sol';
+import {ProjectValidator} from 'contracts/ProjectValidator.sol';
+
 /**
  * @title OBD Yield Distributor
- * @notice Distribute $OBD yield to eligible member projects based on a voted distribution
+ * @notice Distribute $OBD yield to eligible member currentProjects based on a voted distribution
  * @author Breadchain Collective
  */
-
 contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   // --- Registry ---
 
   /// @inheritdoc IOBDYieldDistributor
-  BuildersDollar public BASE_TOKEN;
+  BuildersDollar public token;
+  /// @inheritdoc IOBDYieldDistributor
+  ProjectValidator public projectValidator;
 
   // --- Data ---
 
   /// @notice IOBDYieldDistributor
   YieldDistributorParams internal _params;
 
-  /// @notice Array of projects eligible for yield distribution
-  address[] public projects;
-  /// @notice Array of projects queued for addition to the next cycle
-  address[] public queuedProjectsForAddition;
-  /// @notice Array of projects queued for removal from the next cycle
-  address[] public queuedProjectsForRemoval;
+  /// @notice Array of currentProjects eligible for yield distribution
+  address[] public currentProjects;
 
   // --- Initializer ---
 
@@ -35,7 +34,7 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
     _disableInitializers();
   }
 
-  function initialize(address _baseToken, YieldDistributorParams memory __params, address[] memory _initialProjects)
+  function initialize(address _baseToken, address _projectValidator, YieldDistributorParams memory __params)
     public
     initializer
     enforceParams(__params)
@@ -43,15 +42,9 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   {
     __Ownable_init(msg.sender);
 
-    BASE_TOKEN = BuildersDollar(_baseToken);
+    token = BuildersDollar(_baseToken);
     _params = __params;
     _params.prevCycleStartBlock = 0;
-
-    uint256 _l = _initialProjects.length;
-    projects = new address[](_l);
-    for (uint256 i; i < _l; ++i) {
-      projects[i] = _initialProjects[i];
-    }
   }
 
   // --- View Methods ---
@@ -64,23 +57,17 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   // --- External Methods ---
 
   /// @inheritdoc IOBDYieldDistributor
-  // TODO: add delegate access control
-  function vouch(address _project) external {
-    _vouch(msg.sender, _project);
+  function vouch(bytes32 _projectAttestation) external {
+    // TODO function validateExistingOPVoter
+    validateProject(_projectAttestation);
+    _vouch(_projectAttestation);
   }
 
   /// @inheritdoc IOBDYieldDistributor
-  function queueProjectAddition(address _project) external onlyOwner {
-    if (_isListed(_project, projects)) revert AlreadyMemberProject();
-    if (_isListed(_project, queuedProjectsForAddition)) revert ProjectAlreadyQueued();
-    queuedProjectsForAddition.push(_project);
-  }
-
-  /// @inheritdoc IOBDYieldDistributor
-  function queueProjectRemoval(address _project) external onlyOwner {
-    if (!_isListed(_project, projects)) revert ProjectNotFound();
-    if (_isListed(_project, queuedProjectsForRemoval)) revert ProjectAlreadyQueued();
-    queuedProjectsForRemoval.push(_project);
+  function vouch(bytes32 _projectAttestation, bytes32 idAttestation) external {
+    // TODO function validateNewOPVoter
+    validateProject(_projectAttestation);
+    _vouch(_projectAttestation);
   }
 
   /// @inheritdoc IOBDYieldDistributor
@@ -99,8 +86,8 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   /// @inheritdoc IOBDYieldDistributor
   function resolveYieldDistribution() public view returns (bool _b, bytes memory _data) {
     if (block.number > _params.lastClaimedBlock + _params.cycleLength) {
-      uint256 _l = projects.length;
-      uint256 _currYield = (BASE_TOKEN.balanceOf(address(this)) + BASE_TOKEN.yieldAccrued()) / _l;
+      uint256 _l = currentProjects.length;
+      uint256 _currYield = (token.balanceOf(address(this)) + token.yieldAccrued()) / _l;
 
       if (_l > 0 && _currYield >= _l) {
         uint256 _yieldPerProject = _currYield / _l;
@@ -113,42 +100,22 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   /// @inheritdoc IOBDYieldDistributor
   function distributeYield(bytes calldata _payload) public {
     (uint256 _yieldPerProject, uint256 _l) = abi.decode(_payload, (uint256, uint256));
-    BASE_TOKEN.claimYield(BASE_TOKEN.yieldAccrued());
+    token.claimYield(token.yieldAccrued());
 
     _params.prevCycleStartBlock = _params.lastClaimedBlock;
     _params.lastClaimedBlock = block.number;
 
     for (uint256 i; i < _l; ++i) {
-      BASE_TOKEN.transfer(projects[i], _yieldPerProject);
+      token.transfer(currentProjects[i], _yieldPerProject);
     }
-
-    _updateBreadchainProjects();
-    emit YieldDistributed(_yieldPerProject, projects);
+    emit YieldDistributed(_yieldPerProject, currentProjects);
   }
 
   // --- Internal Utilities ---
 
   /// @notice Internal function for vouching for a project
-  function _vouch(address _delegate, address _project) internal {}
-
-  /// @notice Internal function for updating the project list
-  function _updateBreadchainProjects() internal {
-    for (uint256 i; i < queuedProjectsForAddition.length; ++i) {
-      address _project = queuedProjectsForAddition[i];
-      projects.push(_project);
-      emit ProjectAdded(_project);
-    }
-    address[] memory _prevProjects = projects;
-    delete projects;
-
-    uint256 _l = _prevProjects.length;
-    for (uint256 i; i < _l; ++i) {
-      address _project = _prevProjects[i];
-      if (_isListed(_project, queuedProjectsForRemoval)) emit ProjectRemoved(_project);
-      else projects.push(_project);
-    }
-    delete queuedProjectsForAddition;
-    delete queuedProjectsForRemoval;
+  function _vouch(address _delegate, address _project) internal {
+    // TODO: keep track of vouches
   }
 
   /// @notice see IOBDYieldDistributor
@@ -160,18 +127,8 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
 
   /// @notice see IOBDYieldDistributor
   function _modifyAddress(bytes32 _param, address _contract) internal {
-    if (_param == 'baseToken') BASE_TOKEN = BuildersDollar(_contract);
+    if (_param == 'baseToken') token = BuildersDollar(_contract);
     else revert InvalidParam();
-  }
-
-  /// @notice Internal function for checking if a project is in an array
-  function _isListed(address _project, address[] memory _projects) internal pure returns (bool _b) {
-    uint256 _l = _projects.length;
-    for (uint256 i; i < _l; ++i) {
-      if (_projects[i] == _project) {
-        _b = true;
-      }
-    }
   }
 
   // --- Modifiers ---

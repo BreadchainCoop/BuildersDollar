@@ -2,8 +2,9 @@
 pragma solidity ^0.8.19;
 
 import 'forge-std/Test.sol';
+import 'interfaces/IEAS.sol';
 import {MockEAS} from 'mocks/MockEAS.sol';
-import 'contracts/ValidateProject.sol';
+import {ProjectValidator} from 'contracts/ProjectValidator.sol';
 
 contract ProjectValidatorTest is Test {
   ProjectValidator private validator;

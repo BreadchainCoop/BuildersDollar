@@ -1,9 +1,8 @@
-// contracts/interfaces/IEAS.sol
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 
 // based on https://github.com/ethereum-attestation-service/eas-contracts/blob/master/contracts/IEAS.sol
 // and this https://github.com/ethereum-attestation-service/eas-contracts/blob/master/contracts/Common.sol
-pragma solidity ^0.8.19;
+pragma solidity 0.8.22;
 
 interface IEAS {
   struct Attestation {
