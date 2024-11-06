@@ -15,7 +15,7 @@ contract ProjectManagerTest is Test {
 
   uint64 private SEASON_DURATION = 1000;
   uint64 private currentSeasonExpiry = 2000;
-
+  uint64 private CYCLE_LENGTH = 100;
   address[] private optimismFoundationAttestors;
 
   function setUp() public {
@@ -30,7 +30,8 @@ contract ProjectManagerTest is Test {
       address(mockEAS),
       optimismFoundationAttestors,
       SEASON_DURATION,
-      currentSeasonExpiry
+      currentSeasonExpiry,
+      CYCLE_LENGTH
     );
 
     address projectManagerImp = address(new ProjectManager());

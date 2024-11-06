@@ -18,7 +18,8 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
   BuildersDollar public token;
   /// @notice The precision to use for calculations
   uint256 constant PRECISION = 1e18;
-
+  /// @notice The minimum amount of time between yield distributions
+  uint64 public cycleLength;
   // --- Data ---
 
   /// @notice IOBDYieldDistributor
@@ -36,6 +37,7 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
     address _eas,
     uint256 _seasonDuration,
     uint64 _currentSeasonExpiry,
+    uint64 _cycleLength,
     YieldDistributorParams memory __params,
     address[] memory _OPattestors
   ) public initializer enforceParams(__params) noZeroAddr(_token) {
@@ -45,6 +47,7 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
     token = BuildersDollar(_token);
     _params = __params;
     _params.prevCycleStartBlock = 0;
+    cycleLength = _cycleLength;
   }
 
   // --- View Methods ---
@@ -97,7 +100,7 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
     token.claimYield(_yield);
 
     uint256 _l = currentProjects.length;
-    uint256 _yieldPerProject;
+    uint256 _yieldPerProject = ((_yield * PRECISION) / _l) / PRECISION;
     for (uint256 i; i < _l; ++i) {
       address _project = currentProjects[i];
       if (projectToVouches[_project] > 3) {
