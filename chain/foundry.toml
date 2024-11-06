@@ -12,6 +12,7 @@ wrap_comments = false
 src = "src"
 out = "out"
 lib = "lib"
+via_ir = true
 
 [rpc_endpoints]
 gnosis = "https://rpc.gnosis.gateway.fm"
