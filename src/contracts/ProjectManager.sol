@@ -17,6 +17,7 @@ contract ProjectManager is Initializable {
   mapping(address => uint256) public projectToExpiry;
   mapping(bytes32 => address) public eligibleProject;
   mapping(address => uint256) public projectToVouches;
+  mapping(address => mapping(bytes32 => bool)) public userToProjectVouch;
 
   bytes32 private constant GRANTEE_HASH = keccak256(bytes('Grantee'));
   bytes32 private constant APPLICATION_APPROVED_HASH = keccak256(bytes('Application Approved'));
@@ -34,6 +35,7 @@ contract ProjectManager is Initializable {
   }
 
   function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation) public virtual {
+    require(!userToProjectVouch[msg.sender][projectApprovalAttestation], 'Already vouched');
     // Scenario 2 & 4: Voucher has not vouched yet
     if (!eligibleVoter[msg.sender]) {
       // Validate the voucher's identity
@@ -47,6 +49,7 @@ contract ProjectManager is Initializable {
 
   // Vouch function with only project attestation
   function vouch(bytes32 projectApprovalAttestation) public virtual {
+    require(!userToProjectVouch[msg.sender][projectApprovalAttestation], 'Already vouched');
     // Scenario 1 & 3: Voucher has already vouched
     require(eligibleVoter[msg.sender], 'Identity attestation required for first-time vouchers');
 
