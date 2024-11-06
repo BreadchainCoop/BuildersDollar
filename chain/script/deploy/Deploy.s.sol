@@ -10,10 +10,10 @@ contract DeployYD is Common {
 
   function run() public {
     _deployer = vm.rememberKey(vm.envUint('DEPLOYER_PRIVATE_KEY'));
-    _readJson(deployConfigPath);
+    // _readJson(deployConfigPath);
 
     vm.startBroadcast(_deployer);
-    _deployContracts(_deployer);
+    // _deployContracts(_deployer);
     vm.stopBroadcast();
   }
 }
