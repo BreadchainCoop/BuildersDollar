@@ -16,10 +16,6 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
 
   /// @inheritdoc IOBDYieldDistributor
   BuildersDollar public token;
-  /// @notice The precision to use for calculations
-  uint256 constant PRECISION = 1e18;
-
-  // --- Data ---
 
   /// @notice IOBDYieldDistributor
   YieldDistributorParams internal _params;
@@ -36,6 +32,7 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
     address _eas,
     uint256 _seasonDuration,
     uint64 _currentSeasonExpiry,
+    uint64 _cycleLength,
     YieldDistributorParams memory __params,
     address[] memory _OPattestors
   ) public initializer enforceParams(__params) noZeroAddr(_token) {
@@ -44,7 +41,7 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
 
     token = BuildersDollar(_token);
     _params = __params;
-    _params.prevCycleStartBlock = 0;
+    _params.cycleLength = _cycleLength;
   }
 
   // --- View Methods ---
@@ -93,29 +90,41 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
 
   /// @inheritdoc IOBDYieldDistributor
   function distributeYield() public {
+    uint256 _l = currentProjects.length;
     uint256 _yield = token.yieldAccrued();
+    require(_l > 0, 'No projects to distribute yield to');
+    require(block.timestamp >= _params.lastClaimedTimestamp + _params.cycleLength, 'Cannot distribute yield yet');
+
     token.claimYield(_yield);
 
-    uint256 _l = currentProjects.length;
-    uint256 _yieldPerProject;
+    address[] memory _projectsToEject = new address[](_l);
     for (uint256 i; i < _l; ++i) {
       address _project = currentProjects[i];
-      if (projectToVouches[_project] > 3) {
-        if (projectToExpiry[_project] > block.timestamp) {
-          token.transfer(_project, _yieldPerProject);
-        } else {
-          super.ejectProject(_project);
-        }
+      if (projectToExpiry[_project] > block.timestamp) {
+        _projectsToEject[i] = _project;
       }
-      emit YieldDistributed(_yieldPerProject, currentProjects);
     }
+    for (uint256 i; i < _projectsToEject.length; ++i) {
+      super.ejectProject(_projectsToEject[i]);
+    }
+    uint256 _updatedProjectsLength = currentProjects.length;
+    require(_updatedProjectsLength > 0, 'No projects to distribute yield to');
+    uint256 _yieldPerProject = ((_yield * _params.precision) / _updatedProjectsLength) / _params.precision;
+    for (uint256 i; i < _updatedProjectsLength; ++i) {
+      address _project = currentProjects[i];
+      if (projectToVouches[_project] > 3) {
+        token.transfer(_project, _yieldPerProject);
+      }
+    }
+    _params.lastClaimedTimestamp = uint64(block.timestamp);
+    emit YieldDistributed(_yieldPerProject, currentProjects);
   }
 
   // --- Internal Utilities ---
 
   /// @notice see IOBDYieldDistributor
   function _modifyParam(bytes32 _param, uint256 _value) internal {
-    if (_param == 'cycleLength') _params.cycleLength = _value;
+    if (_param == 'cycleLength') _params.cycleLength = uint64(_value);
     else if (_param == 'minVouches') _params.minVouches = _value;
     else revert InvalidParam();
   }
@@ -136,7 +145,7 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
 
   /// @notice Modifier to enforce the parameters for the yield distributor
   modifier enforceParams(YieldDistributorParams memory _ydp) {
-    if (_ydp.precision == 0 || _ydp.minVouches == 0 || _ydp.cycleLength == 0 || _ydp.lastClaimedBlock == 0) {
+    if (_ydp.precision == 0 || _ydp.minVouches == 0 || _ydp.cycleLength == 0 || _ydp.lastClaimedTimestamp == 0) {
       revert ZeroValue();
     }
     _;
