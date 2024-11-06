@@ -63,17 +63,7 @@ interface IOBDYieldDistributor {
   function modifyAddress(bytes32 _param, address _contract) external;
 
   /**
-   * @notice Determine if the yield distribution is available
-   * @dev Resolver function required for Powerpool job registration. For more details, see the Powerpool documentation:
-   * @dev https://docs.powerpool.finance/powerpool-and-poweragent-network/power-agent/user-guides-and-instructions/i-want-to-automate-my-tasks/job-registration-guide#resolver-job
-   * @return bool Flag indicating if the yield is able to be distributed
-   * @return bytes Calldata used by the resolver to distribute the yield
-   */
-  function resolveYieldDistribution() external view returns (bool, bytes memory);
-
-  /**
    * @notice Distribute $OBD yield to projects based on vouches
-   * @param _payload Calldata used by the resolver to distribute the yield
    */
-  function distributeYield(bytes calldata _payload) external;
+  function distributeYield() external;
 }

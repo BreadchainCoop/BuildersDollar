@@ -16,6 +16,8 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
 
   /// @inheritdoc IOBDYieldDistributor
   BuildersDollar public token;
+  /// @notice The precision to use for calculations
+  uint256 constant PRECISION = 1e18;
 
   // --- Data ---
 
@@ -90,31 +92,23 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
   // --- Public Methods ---
 
   /// @inheritdoc IOBDYieldDistributor
-  function resolveYieldDistribution() public view returns (bool _b, bytes memory _data) {
-    if (block.number > _params.lastClaimedBlock + _params.cycleLength) {
-      uint256 _l = currentProjects.length;
-      uint256 _currYield = (token.balanceOf(address(this)) + token.yieldAccrued()) / _l;
+  function distributeYield() public {
+    uint256 _yield = token.yieldAccrued();
+    token.claimYield(_yield);
 
-      if (_l > 0 && _currYield >= _l) {
-        uint256 _yieldPerProject = _currYield / _l;
-        _b = true;
-        _data = abi.encodeWithSelector(IOBDYieldDistributor.distributeYield.selector, abi.encode(_yieldPerProject));
-      }
-    }
-  }
-
-  /// @inheritdoc IOBDYieldDistributor
-  function distributeYield(bytes calldata _payload) public {
-    (uint256 _yieldPerProject, uint256 _l) = abi.decode(_payload, (uint256, uint256));
-    token.claimYield(token.yieldAccrued());
-
-    _params.prevCycleStartBlock = _params.lastClaimedBlock;
-    _params.lastClaimedBlock = block.number;
-
+    uint256 _l = currentProjects.length;
+    uint256 _yieldPerProject;
     for (uint256 i; i < _l; ++i) {
-      token.transfer(currentProjects[i], _yieldPerProject);
+      address _project = currentProjects[i];
+      if (projectToVouches[_project] > 3) {
+        if (projectToExpiry[_project] > block.timestamp) {
+          token.transfer(_project, _yieldPerProject);
+        } else {
+          super.ejectProject(_project);
+        }
+      }
+      emit YieldDistributed(_yieldPerProject, currentProjects);
     }
-    emit YieldDistributed(_yieldPerProject, currentProjects);
   }
 
   // --- Internal Utilities ---

@@ -11,12 +11,12 @@ contract ProjectManager is Initializable {
   uint256 public SEASON_DURATION;
   uint256 public currentSeasonExpiry;
   uint256 public minRequiredVouches;
-  
+
   address[] public currentProjects;
   mapping(address => bool) public eligibleVoter; // Tracks both eligibility and if they have vouched
   mapping(address => uint256) public projectToExpiry;
   mapping(bytes32 => address) public eligibleProject;
-
+  mapping(address => uint256) public projectToVouches;
 
   bytes32 private constant GRANTEE_HASH = keccak256(bytes('Grantee'));
   bytes32 private constant APPLICATION_APPROVED_HASH = keccak256(bytes('Application Approved'));
@@ -54,7 +54,6 @@ contract ProjectManager is Initializable {
     if (eligibleProject[projectApprovalAttestation] == address(0)) {
       // Validate the project's validity
       validateProject(projectApprovalAttestation);
-
     }
   }
 
@@ -77,10 +76,7 @@ contract ProjectManager is Initializable {
     require(isValidAttester, 'Invalid attester');
 
     uint256 seasonStartTime = currentSeasonExpiry - SEASON_DURATION;
-    require(
-      attestation.time >= seasonStartTime && attestation.time <= currentSeasonExpiry,
-      'Attestation not in current season'
-    );
+    require(attestation.time >= seasonStartTime, 'Attestation not in current season');
 
     (string memory param1,,,, string memory param5) =
       abi.decode(attestation.data, (string, string, string, string, string));
@@ -149,12 +145,23 @@ contract ProjectManager is Initializable {
       string memory selectionMethod
     ) = abi.decode(data, (uint256, string, string, string, string));
 
-      eligibleVoter[claimer] = true;
+    eligibleVoter[claimer] = true;
 
     // Emit an event (optional)
     emit VoterValidated(claimer, farcasterID);
 
     return true;
+  }
+
+  function ejectProject(address project) public {
+    projectToExpiry[project] = 0;
+    projectToVouches[project] = 0;
+    for (uint256 i; i < currentProjects.length; i++) {
+      if (currentProjects[i] == project) {
+        currentProjects[i] = currentProjects[currentProjects.length - 1];
+        currentProjects.pop();
+      }
+    }
   }
 
   function getCurrentProjects() external view returns (address[] memory) {
