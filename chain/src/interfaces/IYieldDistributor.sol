@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.22;
+pragma solidity 0.8.22;
 
-import {ERC20VotesUpgradeable} from '@openzeppelin-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol';
+import {ERC20Votes} from '@openzeppelin/token/ERC20/extensions/ERC20Votes.sol';
+import {Bread} from '@bread-token/src/Bread.sol';
 
 /// @title `YieldDistributor` interface
 interface IYieldDistributor {
@@ -39,34 +40,42 @@ interface IYieldDistributor {
   /// @notice The event emitted when yield is distributed
   event YieldDistributed(uint256 yield, uint256 totalVotes, uint256[] projectDistributions);
 
+  /// @notice The parameters for the yield distributor
   struct YieldDistributorParams {
-    /// @notice The precision to use for calculations
-    uint256 precision;
-    /// @notice The minimum required voting power participants must have to cast a vote
-    uint256 minRequiredVotingPower;
-    /// @notice The maximum number of points a voter can allocate to a project
-    uint256 maxPoints;
+    /// @notice The total number of votes cast in the current cycle
+    uint256 currentVotes;
     /// @notice The minimum number of blocks between yield distributions
     uint256 cycleLength;
+    /// @notice The block number of the last yield distribution
+    uint256 lastClaimedBlock;
+    /// @notice The maximum number of points a voter can allocate to a project
+    uint256 maxPoints;
+    /// @notice The minimum required voting power participants must have to cast a vote
+    uint256 minRequiredVotingPower;
+    /// @notice The precision to use for calculations
+    uint256 precision;
+    /// @notice The block number before the last yield distribution
+    uint256 prevCycleStartBlock;
     /// @notice Amount of the yield is divided equally among projects
     uint256 yieldFixedSplitDivisor;
-    /// @notice The block number of the last yield distribution
-    uint256 lastClaimedBlockNumber;
   }
 
   // --- View Methods ---
 
-  /// @return uint256 The total number of votes cast in the current cycle
-  function currentVotes() external view returns (uint256);
+  /**
+   * @dev BASE_TOKEN is an implementation of BREAD
+   * @return Bread The address of the $BASE_TOKEN token contract
+   */
+  function BASE_TOKEN() external view returns (Bread);
 
-  /// @return uint256 The block number before the last yield distribution
-  function prevCycleStartBlock() external view returns (uint256);
+  /// @return ERC20Votes The address of the $REWARD_TOKEN token contract
+  function REWARD_TOKEN() external view returns (ERC20Votes);
 
   /// @return uint256 The last block number in which a specified account cast a vote
   function accountLastVoted(address) external view returns (uint256);
 
   /// @return YieldDistributorParams The current params of the YieldDistributor
-  function getParams() external view returns (YieldDistributorParams memory);
+  function params() external view returns (YieldDistributorParams memory);
 
   /**
    * @return address[] The current eligible member projects
