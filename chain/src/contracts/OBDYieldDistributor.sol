@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.22;
 
-import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
-import {ERC20} from '@openzeppelin/token/ERC20/ERC20.sol';
+import {OwnableUpgradeable} from '@oz-upgradeable/access/OwnableUpgradeable.sol';
+import {BuildersDollar} from '@bdtoken/BuildersDollar.sol';
 import {IOBDYieldDistributor} from 'interfaces/IOBDYieldDistributor.sol';
-
 /**
  * @title OBD Yield Distributor
  * @notice Distribute $OBD yield to eligible member projects based on a voted distribution
  * @author Breadchain Collective
  */
+
 contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   // --- Registry ---
 
   /// @inheritdoc IOBDYieldDistributor
-  ERC20 public BASE_TOKEN;
+  BuildersDollar public BASE_TOKEN;
 
   // --- Data ---
 
@@ -50,7 +50,7 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
   {
     __Ownable_init(msg.sender);
 
-    BASE_TOKEN = ERC20(_baseToken);
+    BASE_TOKEN = BuildersDollar(_baseToken);
     _params = __params;
 
     uint256 _l = _initialProjects.length;
@@ -125,7 +125,7 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
     (bool _resolved,) = resolveYieldDistribution();
     if (!_resolved) revert YieldNotResolved();
 
-    BASE_TOKEN.claimYield(BASE_TOKEN.yieldAccrued(), address(this));
+    BASE_TOKEN.claimYield(BASE_TOKEN.yieldAccrued());
     _params.prevCycleStartBlock = _params.lastClaimedBlock;
     _params.lastClaimedBlock = block.number;
     uint256 balance = BASE_TOKEN.balanceOf(address(this));
@@ -180,7 +180,7 @@ contract OBDYieldDistributor is OwnableUpgradeable, IOBDYieldDistributor {
 
   /// @notice see IOBDYieldDistributor
   function _modifyAddress(bytes32 _param, address _contract) internal {
-    if (_param == 'baseToken') BASE_TOKEN = ERC20(_contract);
+    if (_param == 'baseToken') BASE_TOKEN = BuildersDollar(_contract);
     else revert InvalidParam();
   }
 

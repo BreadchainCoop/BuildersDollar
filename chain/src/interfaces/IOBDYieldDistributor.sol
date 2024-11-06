@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.22;
 
-import {ERC20} from '@openzeppelin/token/ERC20/ERC20.sol';
+import {BuildersDollar} from '@bdtoken/BuildersDollar.sol';
 
 /// @title `OBDYieldDistributor` interface
 interface IOBDYieldDistributor {
@@ -49,9 +49,9 @@ interface IOBDYieldDistributor {
 
   /**
    * @dev BASE_TOKEN is an implementation of BREAD
-   * @return ERC20 The address of the $BASE_TOKEN token contract
+   * @return BuildersDollar The address of the $BASE_TOKEN token contract
    */
-  function BASE_TOKEN() external view returns (ERC20);
+  function BASE_TOKEN() external view returns (BuildersDollar);
 
   /// @return uint256 The last block number in which a specified account cast a vote
   function accountLastVoted(address) external view returns (uint256);

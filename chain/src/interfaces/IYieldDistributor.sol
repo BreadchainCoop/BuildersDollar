@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.22;
 
-import {ERC20Votes} from '@openzeppelin/token/ERC20/extensions/ERC20Votes.sol';
+import {ERC20Votes} from '@oz/token/ERC20/extensions/ERC20Votes.sol';
 import {Bread} from '@bread-token/src/Bread.sol';
 
 /// @title `YieldDistributor` interface

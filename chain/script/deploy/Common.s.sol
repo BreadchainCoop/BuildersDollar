@@ -4,8 +4,8 @@ pragma solidity 0.8.22;
 import 'forge-std/console.sol';
 import 'forge-std/StdJson.sol';
 import {Script} from 'forge-std/Script.sol';
-import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
-import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
+import {TransparentUpgradeableProxy} from '@oz/proxy/transparent/TransparentUpgradeableProxy.sol';
+import {ProxyAdmin} from '@oz/proxy/transparent/ProxyAdmin.sol';
 import {YieldDistributor, IYieldDistributor} from 'contracts/YieldDistributor.sol';
 
 /// @dev used to deploy the YieldDistributor contract for scripts and tests
