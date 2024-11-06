@@ -42,6 +42,12 @@ interface IOBDYieldDistributor {
 
   // --- Methods ---
 
+  function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation) external;
+
+  function vouch(bytes32 projectApprovalAttestation) external;
+
+  function validateProject(bytes32 approvalAttestation) external returns (bool);
+
   /**
    * @notice Set param to updated value
    * @param _param name of param to update

@@ -55,6 +55,16 @@ contract OBDYieldDistributor is ProjectValidator, OwnableUpgradeable, IOBDYieldD
   // --- External Methods ---
 
   /// @inheritdoc IOBDYieldDistributor
+  function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation) external {
+    super.vouch(projectApprovalAttestation, identityAttestation);
+  }
+
+  /// @inheritdoc IOBDYieldDistributor
+  function vouch(bytes32 projectApprovalAttestation) external {
+    super.vouch(projectApprovalAttestation);
+  }
+
+  /// @inheritdoc IOBDYieldDistributor
   function modifyParam(bytes32 _param, uint256 _value) external onlyOwner {
     if (_value == 0) revert ZeroValue();
     _modifyParam(_param, _value);
