@@ -32,7 +32,7 @@ contract ProjectValidator is Initializable {
     __ProjectValidator_init(_easAddress, _optimismFoundationAttestors, _SEASON_DURATION, _currentSeasonExpiry);
   }
 
-    function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation) external {
+  function vouch(bytes32 projectApprovalAttestation, bytes32 identityAttestation) public virtual {
     // Scenario 2 & 4: Voucher has not vouched yet
     if (!eligibleVoter[msg.sender]) {
       // Validate the voucher's identity
@@ -59,7 +59,7 @@ contract ProjectValidator is Initializable {
   }
 
   // Vouch function with only project attestation
-  function vouch(bytes32 projectApprovalAttestation) external {
+  function vouch(bytes32 projectApprovalAttestation) public virtual {
     // Scenario 1 & 3: Voucher has already vouched
     require(eligibleVoter[msg.sender], 'Identity attestation required for first-time vouchers');
 
@@ -82,7 +82,7 @@ contract ProjectValidator is Initializable {
   }
 
   // Function to validate the project's attestation
-  function validateProject(bytes32 approvalAttestation) public returns (bool) {
+  function validateProject(bytes32 approvalAttestation) public virtual returns (bool) {
     if (eligibleProject[approvalAttestation]) {
       return true;
     }
