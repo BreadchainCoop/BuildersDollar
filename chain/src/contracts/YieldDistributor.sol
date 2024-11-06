@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.22;
+pragma solidity 0.8.22;
 
 import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
 import {Checkpoints} from '@openzeppelin/utils/structs/Checkpoints.sol';
@@ -70,7 +70,7 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
   // --- View Methods ---
 
   /// @inheritdoc IYieldDistributor
-  function getParams() external view returns (YieldDistributorParams memory) {
+  function params() external view returns (YieldDistributorParams memory) {
     return _params;
   }
 
@@ -207,7 +207,7 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
       uint256 _currentProjectDistribution =
         ((_points[i] * _votingPower * _params.precision) / _totalPoints) / _params.precision;
       projectDistributions[i] += _currentProjectDistribution;
-      __voterDistributions[i] = _currentProjectDistribution; // TODO: what is this for?
+      __voterDistributions[i] = _currentProjectDistribution;
     }
 
     accountLastVoted[_account] = block.number;
@@ -269,10 +269,10 @@ contract YieldDistributor is OwnableUpgradeable, IYieldDistributor {
   /// @notice see IYieldDistributor
   function _modifyParam(bytes32 _param, uint256 _value) internal {
     if (_value == 0) revert ZeroValue();
-    if (_param == 'params.minRequiredVotingPower') _params.minRequiredVotingPower = _value;
-    else if (_param == 'params.maxPoints') _params.maxPoints = _value;
-    else if (_param == 'params.cycleLength') _params.cycleLength = _value;
-    else if (_param == 'params.yieldFixedSplitDivisor') _params.yieldFixedSplitDivisor = _value;
+    if (_param == 'minRequiredVotingPower') _params.minRequiredVotingPower = _value;
+    else if (_param == 'maxPoints') _params.maxPoints = _value;
+    else if (_param == 'cycleLength') _params.cycleLength = _value;
+    else if (_param == 'yieldFixedSplitDivisor') _params.yieldFixedSplitDivisor = _value;
     else revert InvalidParam();
   }
 

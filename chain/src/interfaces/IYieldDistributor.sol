@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.22;
+pragma solidity 0.8.22;
 
 import {ERC20Votes} from '@openzeppelin/token/ERC20/extensions/ERC20Votes.sol';
 import {Bread} from '@bread-token/src/Bread.sol';
@@ -75,7 +75,7 @@ interface IYieldDistributor {
   function accountLastVoted(address) external view returns (uint256);
 
   /// @return YieldDistributorParams The current params of the YieldDistributor
-  function getParams() external view returns (YieldDistributorParams memory);
+  function params() external view returns (YieldDistributorParams memory);
 
   /**
    * @return address[] The current eligible member projects
