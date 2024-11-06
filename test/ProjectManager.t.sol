@@ -13,8 +13,8 @@ contract ProjectManagerTest is Test {
   address private optimismFoundation1 = address(0x123);
   address private optimismFoundation2 = address(0x456);
 
-  uint256 private SEASON_DURATION = 1000;
-  uint256 private currentSeasonExpiry = 2000;
+  uint64 private SEASON_DURATION = 1000;
+  uint64 private currentSeasonExpiry = 2000;
 
   address[] private optimismFoundationAttestors;
 
@@ -109,7 +109,7 @@ contract ProjectManagerTest is Test {
   }
 
   function testValidateProjectNotInCurrentSeason() public {
-    uint256 seasonStartTime = currentSeasonExpiry - SEASON_DURATION;
+    uint64 beforeSeasonStart = currentSeasonExpiry - (SEASON_DURATION+ 100);
 
     // Attestation before the season start
     bytes32 uidEarly = keccak256(abi.encodePacked('test-attestation-early'));
@@ -117,7 +117,7 @@ contract ProjectManagerTest is Test {
       uid: uidEarly,
       schema: bytes32(0),
       refUID: bytes32(0),
-      time: uint64(seasonStartTime - 1),
+      time: beforeSeasonStart,
       expirationTime: 0,
       revocationTime: 0,
       recipient: address(0x789),
@@ -136,7 +136,7 @@ contract ProjectManagerTest is Test {
       uid: uidLate,
       schema: bytes32(0),
       refUID: bytes32(0),
-      time: uint64(currentSeasonExpiry + 1),
+      time: beforeSeasonStart,
       expirationTime: 0,
       revocationTime: 0,
       recipient: address(0x789),
