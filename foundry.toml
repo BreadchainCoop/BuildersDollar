@@ -7,6 +7,7 @@ int_types = 'long'
 quote_style = 'single'
 number_underscore = 'thousands'
 wrap_comments = false
+fs_permissions = [{ access = "read-write", path = "./" }]
 
 [profile.default]
 src = "src"
