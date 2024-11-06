@@ -35,7 +35,7 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
     address _token,
     address _eas,
     uint256 _seasonDuration,
-    uint256 _currentSeasonExpiry,
+    uint64 _currentSeasonExpiry,
     YieldDistributorParams memory __params,
     address[] memory _OPattestors
   ) public initializer enforceParams(__params) noZeroAddr(_token) {

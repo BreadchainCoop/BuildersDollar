@@ -9,7 +9,7 @@ contract ProjectManager is Initializable {
   address[] public optimismFoundationAttestors;
 
   uint256 public SEASON_DURATION;
-  uint256 public currentSeasonExpiry;
+  uint64 public currentSeasonExpiry;
   uint256 public minRequiredVouches;
 
   address[] public currentProjects;
@@ -28,7 +28,7 @@ contract ProjectManager is Initializable {
     address _easAddress,
     address[] memory _optimismFoundationAttestors,
     uint256 _SEASON_DURATION,
-    uint256 _currentSeasonExpiry
+    uint64 _currentSeasonExpiry
   ) public initializer {
     __ProjectManager_init(_easAddress, _optimismFoundationAttestors, _SEASON_DURATION, _currentSeasonExpiry);
   }
@@ -174,7 +174,7 @@ contract ProjectManager is Initializable {
     address _easAddress,
     address[] memory _optimismFoundationAttestors,
     uint256 _SEASON_DURATION,
-    uint256 _currentSeasonExpiry
+    uint64 _currentSeasonExpiry
   ) internal onlyInitializing {
     eas = IEAS(_easAddress);
     optimismFoundationAttestors = _optimismFoundationAttestors;
