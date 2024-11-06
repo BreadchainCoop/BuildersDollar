@@ -13,3 +13,6 @@
 [submodule "chain/lib/eas-contracts"]
 	path = chain/lib/eas-contracts
 	url = https://github.com/ethereum-attestation-service/eas-contracts.git
+[submodule "chain/lib/token"]
+	path = chain/lib/token
+	url = https://github.com/BreadchainCoop/BuildersDollarToken.git
