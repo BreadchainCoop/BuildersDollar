@@ -1,0 +1,9 @@
+@openzeppelin/=lib/openzeppelin-contracts/contracts/
+@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@bread-token/=lib/bread-token-v2/
+
+contracts/=src/contracts/
+interfaces/=src/interfaces/
+libraries/=src/libraries/
+script/=script/
+test/=test/
