@@ -110,7 +110,7 @@ contract ProjectManagerTest is Test {
   }
 
   function testValidateProjectNotInCurrentSeason() public {
-    uint64 beforeSeasonStart = currentSeasonExpiry - (SEASON_DURATION+ 100);
+    uint64 beforeSeasonStart = currentSeasonExpiry - (SEASON_DURATION + 100);
 
     // Attestation before the season start
     bytes32 uidEarly = keccak256(abi.encodePacked('test-attestation-early'));
@@ -523,5 +523,4 @@ contract ProjectManagerTest is Test {
     vm.expectRevert('Invalid param1');
     projectManager.vouch(projectUidInvalid);
   }
-
 }
