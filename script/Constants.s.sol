@@ -10,10 +10,10 @@ uint256 constant MINIMUM_VOTE = 10 ether;
 address constant ADMIN = 0x918dEf5d593F46735f74F9E2B280Fe51AF3A99ad;
 address constant TOKEN = 0xa555d5344f6FB6c65da19e403Cb4c1eC4a1a5Ee3;
 address constant EAS = address(0x1);
-uint256 constant SEASON_DURATION = 30 days;
-uint64 constant CURRENT_SEASON_EXPIRY = 32_323_232_323;
-uint64 constant CYCLE_LENGTH = 7 days;
-uint64 constant LAST_CLAIMED_TIMESTAMP = 32_323_232_323;
+uint256 constant SEASON_DURATION = 365 days;
+uint64 constant CYCLE_LENGTH = 30 days;
+uint64 constant SEASON_START_TIMESTAMP = 1_723_148_017;
+uint64 constant LAST_CLAIMED_TIMESTAMP = 0;
 uint256 constant MIN_VOUCHES = 3;
 uint256 constant PRECISION = 1e18;
 

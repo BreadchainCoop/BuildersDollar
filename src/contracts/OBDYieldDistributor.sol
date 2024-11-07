@@ -143,9 +143,9 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
 
   /// @notice Modifier to enforce the parameters for the yield distributor
   modifier enforceParams(YieldDistributorParams memory _ydp) {
-    if (_ydp.precision == 0 || _ydp.minVouches == 0 || _ydp.cycleLength == 0 || _ydp.lastClaimedTimestamp == 0) {
-      revert ZeroValue();
-    }
+    // if (_ydp.precision == 0 || _ydp.minVouches == 0 || _ydp.cycleLength == 0 || _ydp.lastClaimedTimestamp == 0) {
+    //   revert ZeroValue();
+    // }
     _;
   }
 }
