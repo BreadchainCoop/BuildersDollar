@@ -13,7 +13,7 @@ contract DeployYD is Common {
     _readConfigFile(_configPath);
 
     vm.startBroadcast(_deployer);
-    // _deployContracts(_deployer);
+    _deployYD();
     vm.stopBroadcast();
   }
 }

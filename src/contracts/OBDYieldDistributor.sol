@@ -32,7 +32,6 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
     address _eas,
     uint256 _seasonDuration,
     uint64 _currentSeasonExpiry,
-    uint64 _cycleLength,
     YieldDistributorParams memory __params,
     address[] memory _OPattestors
   ) public initializer enforceParams(__params) noZeroAddr(_token) {
@@ -41,7 +40,6 @@ contract OBDYieldDistributor is ProjectManager, OwnableUpgradeable, IOBDYieldDis
 
     token = BuildersDollar(_token);
     _params = __params;
-    _params.cycleLength = _cycleLength;
   }
 
   // --- View Methods ---
