@@ -7,7 +7,7 @@ import {Common} from 'script/deploy/Common.s.sol';
 
 contract Base is Common, Test {
   function setUp() public virtual {
-    vm.createSelectFork(vm.rpcUrl('gnosis'));
+    vm.createSelectFork(vm.rpcUrl('optimism'));
     _readConfigRegistry();
     _generateMockDataForTest();
     _deployYD();

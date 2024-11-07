@@ -29,6 +29,7 @@ contract Common is Script {
   IOBDYieldDistributor.YieldDistributorParams internal _params;
   OBDYieldDistributor public obdYieldDistributor;
 
+  /// @dev for scripts
   function _readConfigFile() internal {
     _configData = vm.readFile(_configPath);
     _admin = stdJson.readAddress(_configData, '._admin');
@@ -46,12 +47,12 @@ contract Common is Script {
     });
   }
 
+  /// @dev for tests
   function _readConfigRegistry() internal {
     _admin = ADMIN;
     _token = TOKEN;
-    _eas = EAS;
     _seasonDuration = SEASON_DURATION;
-    _currentSeasonExpiry = CURRENT_SEASON_EXPIRY;
+    _currentSeasonExpiry = SEASON_START_TIMESTAMP + uint64(SEASON_DURATION);
     _attestors = [address(0x420), address(0x421), address(0x423)];
 
     _params = IOBDYieldDistributor.YieldDistributorParams({
@@ -62,6 +63,7 @@ contract Common is Script {
     });
   }
 
+  /// @dev for tests
   function _generateMockDataForTest() internal {
     _eas = address(new MockEAS());
     _token = address(new BuildersDollar(DAI, A_DAI, AAVE_LP, AAVE_REWARDS));
@@ -70,6 +72,7 @@ contract Common is Script {
     );
   }
 
+  /// @dev for scripts and tests
   function _deployYD() internal {
     bytes memory _implementationData = abi.encodeWithSelector(
       OBDYieldDistributor.initialize.selector, _token, _eas, _seasonDuration, _currentSeasonExpiry, _params, _attestors

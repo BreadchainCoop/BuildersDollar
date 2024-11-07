@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import 'interfaces/IEAS.sol';
+import {IEAS} from 'interfaces/IEAS.sol';
 
 contract MockEAS is IEAS {
   mapping(bytes32 => Attestation) private _attestations;
