@@ -10,9 +10,6 @@
 [submodule "chain/lib/bread-token-v2"]
 	path = lib/bread-token-v2
 	url = https://github.com/BreadchainCoop/bread-token-v2
-[submodule "chain/lib/eas-contracts"]
-	path = lib/eas-contracts
-	url = https://github.com/ethereum-attestation-service/eas-contracts.git
 [submodule "chain/lib/token"]
 	path = lib/token
 	url = https://github.com/BreadchainCoop/BuildersDollarToken.git
