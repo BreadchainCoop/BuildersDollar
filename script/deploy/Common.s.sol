@@ -14,6 +14,8 @@ import {BuildersDollar} from '@bdtoken/BuildersDollar.sol';
 
 /// @dev used to deploy the YieldDistributor contract for scripts and tests
 contract Common is Script {
+  string public _configPath = string(bytes('./script/deploy/config/deployYD.json'));
+
   string internal _configData;
   address internal _admin;
   address internal _token;
@@ -25,10 +27,10 @@ contract Common is Script {
   address[] internal _attestors;
 
   IOBDYieldDistributor.YieldDistributorParams internal _params;
-  IOBDYieldDistributor public obdYieldDistributor;
+  OBDYieldDistributor public obdYieldDistributor;
 
-  function _readConfigFile(string memory _path) internal {
-    _configData = vm.readFile(_path);
+  function _readConfigFile() internal {
+    _configData = vm.readFile(_configPath);
     _admin = stdJson.readAddress(_configData, '._admin');
     _token = stdJson.readAddress(_configData, '._token');
     _eas = stdJson.readAddress(_configData, '._eas');
@@ -41,6 +43,22 @@ contract Common is Script {
       lastClaimedTimestamp: uint64(stdJson.readUint(_configData, '._lastClaimedTimestamp')),
       minVouches: stdJson.readUint(_configData, '._minVouches'),
       precision: stdJson.readUint(_configData, '._precision')
+    });
+  }
+
+  function _readConfigRegistry() internal {
+    _admin = ADMIN;
+    _token = TOKEN;
+    _eas = EAS;
+    _seasonDuration = SEASON_DURATION;
+    _currentSeasonExpiry = CURRENT_SEASON_EXPIRY;
+    _attestors = [address(0x420), address(0x421), address(0x423)];
+
+    _params = IOBDYieldDistributor.YieldDistributorParams({
+      cycleLength: CYCLE_LENGTH,
+      lastClaimedTimestamp: LAST_CLAIMED_TIMESTAMP,
+      minVouches: MIN_VOUCHES,
+      precision: PRECISION
     });
   }
 
@@ -58,7 +76,7 @@ contract Common is Script {
     );
     address _implementation = address(new OBDYieldDistributor());
     address _proxy = address(new TransparentUpgradeableProxy(_implementation, _admin, _implementationData));
-    console.log('Deployed YieldDistributor at address: {}', _proxy);
+    console.log('Deployed YieldDistributor at address:', _proxy);
 
     obdYieldDistributor = OBDYieldDistributor(_proxy);
   }
