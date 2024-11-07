@@ -3,54 +3,63 @@ pragma solidity ^0.8.22;
 
 import 'forge-std/console.sol';
 import 'forge-std/StdJson.sol';
+import 'script/Constants.s.sol';
 import {Script} from 'forge-std/Script.sol';
 import {TransparentUpgradeableProxy} from '@oz/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {ProxyAdmin} from '@oz/proxy/transparent/ProxyAdmin.sol';
-// import {YieldDistributor, IYieldDistributor} from 'contracts/YieldDistributor.sol';
+import {OBDYieldDistributor, IOBDYieldDistributor} from 'contracts/OBDYieldDistributor.sol';
+import {MockEAS} from 'mocks/MockEAS.sol';
+import {EIP173ProxyWithReceive} from '@bdtoken/vendor/EIP173ProxyWithReceive.sol';
+import {BuildersDollar} from '@bdtoken/BuildersDollar.sol';
 
 /// @dev used to deploy the YieldDistributor contract for scripts and tests
 contract Common is Script {
-/**
- * address internal _admin;
- *   address internal _baseToken;
- *   IYieldDistributor.YieldDistributorParams internal _params;
- *   address[] internal _projects;
- *
- *   YieldDistributor public yieldDistributorProxy;
- *
- *   function _readJson(string memory _path) internal {
- *     string memory _configData = vm.readFile(_path);
- *
- *     _admin = stdJson.readAddress(_configData, '._admin');
- *     _baseToken = stdJson.readAddress(_configData, '._baseToken');
- *
- *     _params = IYieldDistributor.YieldDistributorParams({
- *       currentVotes: 0,
- *       cycleLength: stdJson.readUint(_configData, '._cycleLength'),
- *       lastClaimedBlock: stdJson.readUint(_configData, '._lastClaimedBlock'),
- *       maxPoints: stdJson.readUint(_configData, '._maxPoints'),
- *       minRequiredVotingPower: stdJson.readUint(_configData, '._minRequiredVotingPower'),
- *       precision: stdJson.readUint(_configData, '._precision'),
- *       prevCycleStartBlock: 0,
- *       yieldFixedSplitDivisor: stdJson.readUint(_configData, '._yieldFixedSplitDivisor')
- *     });
- *
- *     _projects = abi.decode(stdJson.parseRaw(_configData, '._projects'), (address[]));
- *   }
- *
- *   function _deployContracts(address _deployer) internal {
- *     // TODO: add RewardToken contract deployment - just use precompute for now
- *     uint256 _nonce = 4; // if done immediately after this script? TODO: add to current nonce of use CREATE2
- *     address _rewardToken = computeCreateAddress(_deployer, _nonce);
- *
- *     bytes memory _implementationData =
- *       abi.encodeWithSelector(YieldDistributor.initialize.selector, _baseToken, _rewardToken, _params, _projects);
- *
- *     address _implementation = address(new YieldDistributor());
- *     address _proxy = address(new TransparentUpgradeableProxy(_implementation, _admin, _implementationData));
- *     console.log('Deployed YieldDistributor at address: {}', _proxy);
- *
- *     yieldDistributorProxy = YieldDistributor(_proxy);
- *   }
- */
+  string internal _configData;
+  address internal _admin;
+  address internal _token;
+  address internal _eas;
+
+  uint256 internal _seasonDuration;
+  uint64 internal _currentSeasonExpiry;
+
+  address[] internal _attestors;
+
+  IOBDYieldDistributor.YieldDistributorParams internal _params;
+  IOBDYieldDistributor public obdYieldDistributor;
+
+  function _readConfigFile(string memory _path) internal {
+    _configData = vm.readFile(_path);
+    _admin = stdJson.readAddress(_configData, '._admin');
+    _token = stdJson.readAddress(_configData, '._token');
+    _eas = stdJson.readAddress(_configData, '._eas');
+    _seasonDuration = stdJson.readUint(_configData, '._seasonDuration');
+    _currentSeasonExpiry = uint64(stdJson.readUint(_configData, '._currentSeasonExpiry'));
+    _attestors = abi.decode(stdJson.parseRaw(_configData, '._attestors'), (address[]));
+
+    _params = IOBDYieldDistributor.YieldDistributorParams({
+      cycleLength: uint64(stdJson.readUint(_configData, '._cycleLength')),
+      lastClaimedTimestamp: uint64(stdJson.readUint(_configData, '._lastClaimedTimestamp')),
+      minVouches: stdJson.readUint(_configData, '._minVouches'),
+      precision: stdJson.readUint(_configData, '._precision')
+    });
+  }
+
+  function _generateMockDataForTest() internal {
+    _eas = address(new MockEAS());
+    _token = address(new BuildersDollar(DAI, A_DAI, AAVE_LP, AAVE_REWARDS));
+    EIP173ProxyWithReceive _proxy = new EIP173ProxyWithReceive(
+      _token, address(this), abi.encodeWithSelector(BuildersDollar.initialize.selector, BD_NAME, BD_SYM)
+    );
+  }
+
+  function _deployYD() internal {
+    bytes memory _implementationData = abi.encodeWithSelector(
+      OBDYieldDistributor.initialize.selector, _token, _eas, _seasonDuration, _currentSeasonExpiry, _params, _attestors
+    );
+    address _implementation = address(new OBDYieldDistributor());
+    address _proxy = address(new TransparentUpgradeableProxy(_implementation, _admin, _implementationData));
+    console.log('Deployed YieldDistributor at address: {}', _proxy);
+
+    obdYieldDistributor = OBDYieldDistributor(_proxy);
+  }
 }
