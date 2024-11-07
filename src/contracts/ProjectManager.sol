@@ -7,6 +7,7 @@ import 'interfaces/IEAS.sol';
 contract ProjectManager is Initializable {
   IEAS public eas;
   address[] public optimismFoundationAttestors;
+  address public constant hardcodedAttesterAddress = 0x8Bc704386DCE0C4f004194684AdC44Edf6e85f07;
 
   uint256 public SEASON_DURATION;
   uint64 public currentSeasonExpiry;
@@ -19,9 +20,10 @@ contract ProjectManager is Initializable {
   mapping(address => uint256) public projectToVouches;
   mapping(address => mapping(bytes32 => bool)) public userToProjectVouch;
 
-  bytes32 private constant GRANTEE_HASH = keccak256(bytes('Grantee'));
+  bytes32 private constant GRANTEE_HASH = keccak256(bytes('Season 6 application approval'));
   bytes32 private constant APPLICATION_APPROVED_HASH = keccak256(bytes('Application Approved'));
 
+  // event when using on-chain attestation
   event ProjectValidated(bytes32 indexed approvalAttestation, address indexed recipient);
   event VoterValidated(address indexed claimer, uint256 indexed farcasterID);
 
@@ -60,43 +62,62 @@ contract ProjectManager is Initializable {
     }
   }
 
-  // Function to validate the project's attestation
-  function validateProject(bytes32 approvalAttestation) public virtual returns (bool) {
-    if (eligibleProject[approvalAttestation] != address(0)) {
-      return true;
+  function validateProject(
+        bytes32 uid,        // Unique identifier for attestation
+        bytes32 schema,
+        address recipient,
+        uint64 time,
+        uint64 expirationTime,
+        bool revocable,
+        bytes32 refUID,
+        bytes calldata data,
+        uint256 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external returns (bool) {
+        // Step 1: Verify the signature of the message
+        bytes32 messageHash = keccak256(abi.encode(
+            schema,
+            recipient,
+            time,
+            expirationTime,
+            revocable,
+            refUID,
+            keccak256(data), // Hash the data field
+            nonce
+        ));
+        
+        // Ethereum Signed Message hash for ecrecover
+        bytes32 ethSignedMessageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
+        );
+
+        address signer = ecrecover(ethSignedMessageHash, v, r, s);
+        require(signer == hardcodedAttesterAddress, "Invalid signature");
+
+        // Step 2: Validate the UID with EAS
+        IEAS.Attestation memory attestation = eas.getAttestation(uid);
+        require(attestation.uid != bytes32(0), "Attestation not found");
+        require(attestation.recipient == recipient, "UID does not resolve to recipient");
+        require(attestation.data == data, "UID does not resolve to provided data");
+
+        // Step 3: Ensure attestation timing is within current season
+        uint256 seasonStartTime = currentSeasonExpiry - SEASON_DURATION;
+        require(time >= seasonStartTime && time <= currentSeasonExpiry, "Attestation not in current season");
+
+        // Step 4: Decode the data and validate specific values
+        (string memory param1,,,, string memory param5) = abi.decode(data, (string, string, string, string, string));
+        require(keccak256(bytes(param1)) == GRANTEE_HASH, "Invalid param1");
+        require(keccak256(bytes(param5)) == APPLICATION_APPROVED_HASH, "Invalid param5");
+
+        // Step 5: Register project address in eligible projects mapping
+        eligibleProject[uid] = recipient;
+        
+        emit ProjectValidated(uid, recipient);
+
+        return true;
     }
-
-    IEAS.Attestation memory attestation = eas.getAttestation(approvalAttestation);
-    require(attestation.uid != bytes32(0), 'Attestation not found');
-
-    bool isValidAttester = false;
-    for (uint256 i = 0; i < optimismFoundationAttestors.length; i++) {
-      if (attestation.attester == optimismFoundationAttestors[i]) {
-        isValidAttester = true;
-        break;
-      }
-    }
-    require(isValidAttester, 'Invalid attester');
-
-    uint256 seasonStartTime = currentSeasonExpiry - SEASON_DURATION;
-    require(attestation.time >= seasonStartTime, 'Attestation not in current season');
-
-    (string memory param1,,,, string memory param5) =
-      abi.decode(attestation.data, (string, string, string, string, string));
-
-    require(keccak256(bytes(param1)) == GRANTEE_HASH, 'Invalid param1');
-    require(keccak256(bytes(param5)) == APPLICATION_APPROVED_HASH, 'Invalid param5');
-    address projectAddress = attestation.recipient;
-    eligibleProject[approvalAttestation] = projectAddress;
-    // Add the project to currentProjects if not already included
-    currentProjects.push(projectAddress);
-    // Mark the project as eligible and set expiry
-    eligibleProject[approvalAttestation] = projectAddress;
-    projectToExpiry[projectAddress] = currentSeasonExpiry;
-    emit ProjectValidated(approvalAttestation, projectAddress);
-
-    return true;
-  }
 
   // Function to validate the voucher's identity
   // function temporarily public for testing
